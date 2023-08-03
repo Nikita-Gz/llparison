@@ -1,3 +1,4 @@
 .git/
 .venv/
 s/
+__pycache__/

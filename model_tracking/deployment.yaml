@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-tracking-deployment
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+  selector:
+    matchLabels:
+      app: model-tracking-app
+  template:
+    metadata:
+      labels:
+        app: model-tracking-app
+    spec:
+      containers:
+      - name: model-tracking-container
+        image: data6s/model_tracking:latest
+        command: ['python', '/app/driver.py']
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "128Mi"
+            cpu: "500m"
+      terminationGracePeriodSeconds: 2
