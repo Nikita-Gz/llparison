@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongo
+  name: mongo-nodeport-svc
+spec:
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+    nodePort: 32000
+  selector:
+    app: mongo
+  type: NodePort
+status:
+  loadBalancer: {}
+#
+#---
+#apiVersion: v1
+#data:
+  # todo: fix passwords
+#  password: cGFzc3dvcmQxMjM=
+#  username: YWRtaW51c2Vy
+#kind: Secret
+#metadata:
+#  creationTimestamp: null
+#  name: mongo-creds
+#'''
