@@ -7,12 +7,14 @@ import requests
 import pandas as pd
 import logging
 
+from typing import *
+
 log = logging.getLogger("model_scanner")
 logging.basicConfig(level=logging.INFO)
 
 from db_connector import DatabaseConnector
 
-def get_openrouter_models(tracking_date: str) -> pd.DataFrame:
+def get_openrouter_models(tracking_date: str) -> Dict[str, Dict]:
   opentouter_models_link = 'https://openrouter.ai/api/v1/models'
   response = requests.request("GET", opentouter_models_link)
   assert response.status_code == 200, f"OpenRouter models request returned with code {response.status_code}"
@@ -26,22 +28,21 @@ def get_openrouter_models(tracking_date: str) -> pd.DataFrame:
       'first_tracked_on': tracking_date,
       'last_tracked_on': tracking_date,
       'available': None,
-      'original_name': source + ':' + model['id'],
+      '_id': source + ':' + model['id'],
       'owner': model['id'].split('/')[0],
       'name': model['id'].split('/')[1],
       'price_prompt': model['pricing']['prompt'],
-      'ff_inference_api_supported': False,
+      'hf_inference_api_supported': False,
       'source': 'OpenRouter',
       'price_completion': model['pricing']['completion'],
       'context': model['context_length'],
       'prompt_limit': model['input_limits']['prompt_tokens'],
       'max_tokens_limit': model['input_limits']['max_tokens'],
     }
-    assert set(model_data.keys()) == set(DatabaseConnector.columns_list)
+    #assert set(model_data.keys()) == set(DatabaseConnector.columns_list)
     formatted_models.append(model_data)
   
-  df = pd.DataFrame(formatted_models)
-  return df
+  return formatted_models
 
 
 def scan_for_trackable_models(tracking_date: str) -> pd.DataFrame:
@@ -71,41 +72,17 @@ def perform_tracking(tracking_date: str):
   # 4) check availability of the models, drop those for which the check is applicable but failed
   # 5) save currently trackable models to db, saving first tracking date if the model is present in list #1
 
-  print('Starting tracking on date {tracking_date}')
+  print('\n\nStarting tracking on date {tracking_date}')
 
   db = DatabaseConnector()
 
-  currently_trackable_models = scan_for_trackable_models(tracking_date)
-  log.info(f'Got {len(currently_trackable_models)} currently_trackable_models')
-  previously_tracked_hf_models = db.get_unique_tracked_hf_models()
-  log.info(f'Got {len(previously_tracked_hf_models)} previously_tracked_hf_models')
+  # only works with openrouter rn
 
-  all_trackable_models = pd.concat(
-    [currently_trackable_models, previously_tracked_hf_models],
-    ignore_index=True)
-  all_trackable_models = all_trackable_models.drop_duplicates('original_name')
-  all_trackable_models = all_trackable_models.copy()
-  log.info(f'Got {len(all_trackable_models)} all_trackable_models')
-  
-  assert set(all_trackable_models.columns) == set(DatabaseConnector.columns_list), f'{all_trackable_models.columns}'
-
-  all_trackable_models['available'] = check_availability_if_applicable(all_trackable_models)
-  all_trackable_models['last_tracked_on'] = tracking_date
-
-  unique_already_tracked_models = db.get_unique_tracked_models()
-  log.info(f'Got unique_already_tracked_models: \n{unique_already_tracked_models.head()}')
-  already_tracked_names = unique_already_tracked_models['original_name']
-
-  def first_tracking_date_assigner(row):
-    name = row['original_name']
-    if name in already_tracked_names:
-      log.info(f'Model {name} is already tracked')
-      return unique_already_tracked_models.loc[already_tracked_names == name, 'first_tracked_on'].iloc[0]
-    else:
-      return name
-  all_trackable_models['first_tracked_on'] = all_trackable_models.apply(first_tracking_date_assigner, axis=1)
-
-  db.save_models_tracking(all_trackable_models)
+  models_trackable_now = get_openrouter_models(tracking_date)
+  log.info(f'Got {len(models_trackable_now)} models_trackable_now')
+  for model in models_trackable_now:
+    log.info(f'Saving model {model}')
+    db.save_model_tracking_properly(model, tracking_date)
 
 if __name__ == '__main__':
   perform_tracking('aaaaa')
