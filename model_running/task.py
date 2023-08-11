@@ -5,6 +5,8 @@ from typing import *
 import string
 
 from model_runner import ModelRunner
+from runnable_model_data import RunnableModel
+from task_output import TaskOutput
 
 # todo: !! custom tasks must be saved to db and loaded from it
 
@@ -13,20 +15,17 @@ class TaskType(Enum):
   SPAM_CLASSIFICATION = 2
   CUSTOM = 3
 
-class TaskOutput:
-  def __init__(self, metrics, model_outputs, interpreted_outputs, input_codes) -> None:
-    self.metrics = None
-    self.model_outputs = None
-    self.interpreted_outputs = None
-    self.input_codes = None # input code will allow Task class to return the exact input
-
 class Task:
   alphabet2idx = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
   idx2alphabet = {letter:i for i, letter in enumerate(string.ascii_uppercase)}
 
   def __init__(self, task_type: TaskType) -> None:
     self.type = task_type
-  
+
+  def is_model_applicable_for_the_task(self, model: RunnableModel):
+    # todo: make this work
+    return True
+
   def load_reading_comprehension_data(self) -> Tuple[Dict, Dict]:
     # loads RACE data.
     # Stores it as a dict of texts {text_id: text} and questions {question_id: {text_id, question, options, answer}}
@@ -94,7 +93,11 @@ class Task:
     return TaskOutput(metrics, model_outputs, interpreted_outputs, input_codes)
 
   # returns a list of metrics, outputs
-  def run_task(self):
+  def run_task(self, model, config) -> TaskOutput:
+    if self.type == TaskType.READING_COMPREHENSION:
+      return self.run_reading_comprehension(model, config)
+    else:
+      raise NotImplementedError(f'Tried running an unsupported task type, {self.type}')
     pass
 
 
