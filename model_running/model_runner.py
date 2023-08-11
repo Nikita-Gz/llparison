@@ -21,5 +21,5 @@ class ModelRunner:
   #def run_task_with_preprocessing(task):
   #  pass
   
-  def run_openrouter_payload(payload):
-    
+  def run_openrouter_payload(payload) -> str:
+    return 'OpenRouter response. WIP'

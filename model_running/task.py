@@ -14,7 +14,7 @@ class TaskType(Enum):
   CUSTOM = 3
 
 class TaskOutput:
-  def __init__(self) -> None:
+  def __init__(self, metrics, model_outputs, interpreted_outputs, input_codes) -> None:
     self.metrics = None
     self.model_outputs = None
     self.interpreted_outputs = None
@@ -65,15 +65,33 @@ class Task:
       final_text = '\n'.join(['Text:', text, 'Question:', question_text, 'Options:', options_text, 'Answer:'])
       return final_text
 
+    def get_answer_id_from_model_output(model_output):
+      # todo
+      return 0
+
     runner = ModelRunner(model, config)
     model_outputs = []
+    metrics = {'accuracy': 0}
+    interpreted_outputs = []
+    input_codes = []
     for question_id in rc_questions:
+      input_codes.append(question_id)
       question_dict = rc_questions[question_id]
+      answer_id = self.alphabet2idx[question_dict['answer']]
       text = rc_texts[question_dict['text_id']]
       prompt = prompt_constructor(text, question_dict)
-      model_outputs.append(runner.model_run_function(prompt))
-    
-    # todo: continue from here?
+
+      model_output = runner.model_run_function(prompt)
+      model_answer_id = get_answer_id_from_model_output(model_output)
+
+      if model_answer_id == answer_id:
+        metrics['accuracy'] += 1
+
+      model_outputs.append(model_output)
+      interpreted_outputs.append(model_answer_id)
+
+    metrics['accuracy'] = metrics['accuracy'] / len(rc_questions)
+    return TaskOutput(metrics, model_outputs, interpreted_outputs, input_codes)
 
   # returns a list of metrics, outputs
   def run_task(self):
