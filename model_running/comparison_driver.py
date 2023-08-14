@@ -9,6 +9,9 @@ from model_data_loader import DatabaseConnector
 from run_config import Config
 from task_output import TaskOutput
 
+def only_free_cost_check_callback(cost: float):
+  return cost == 0
+
 def drive():
   db_connector = DatabaseConnector()
 
@@ -33,7 +36,10 @@ def drive():
       
       configs = [Config()]
       for config in configs:
-        task_output = task.run_task(model, config)
+        task_output = task.run_task(model, config, only_free_cost_check_callback)
+        if task_output is None:
+          print('None output')
+          continue
         db_connector.save_run(model, task.type, 1, config, [task_output], timestamp)
     
 

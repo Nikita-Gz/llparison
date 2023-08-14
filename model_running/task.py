@@ -3,12 +3,17 @@ import json
 import os
 from typing import *
 import string
+import tiktoken
+import logging
 
 from model_runner import ModelRunner
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
 
 # todo: !! custom tasks must be saved to db and loaded from it
+
+log = logging.getLogger("task.py")
+logging.basicConfig(level=logging.INFO)
 
 class TaskType(Enum):
   READING_COMPREHENSION = 1
@@ -49,7 +54,8 @@ class Task:
     
     return rc_texts, rc_questions
 
-  def run_reading_comprehension(self, model, config):
+
+  def run_reading_comprehension(self, model: RunnableModel, config, cost_check_callback=None) -> Union[TaskOutput, None]:
     rc_texts, rc_questions = self.load_reading_comprehension_data()
 
     # todo: make the preprocessing code for the specific model on a specific task
@@ -64,15 +70,34 @@ class Task:
       final_text = '\n'.join(['Text:', text, 'Question:', question_text, 'Options:', options_text, 'Answer:'])
       return final_text
 
-    def get_answer_id_from_model_output(model_output):
-      # todo
-      return 0
+    def get_answer_id_from_model_output(model_output: str) -> Union[int, None]:
+      if len(model_output) == 0:
+        return None
+      first_letter = model_output[0].upper()
+      return self.alphabet2idx.get(first_letter, None)
 
     runner = ModelRunner(model, config)
     model_outputs = []
     metrics = {'accuracy': 0}
     interpreted_outputs = []
     input_codes = []
+
+    # cost estimator
+    # todo: make it a function
+    if cost_check_callback is not None:
+      prompts = []
+      for question_id in rc_questions:
+        question_dict = rc_questions[question_id]
+        text = rc_texts[question_dict['text_id']]
+        prompts.append(prompt_constructor(text, question_dict))
+      token_count = runner.count_tokens(prompts)
+      cost = model.price * token_count
+      cost_is_appropriate = cost_check_callback(cost)
+      if not cost_is_appropriate:
+        log.warning(f'Skipping model {model._id} because the cost is too high ({cost})')
+        return None
+
+    # evaluator
     for question_id in rc_questions:
       input_codes.append(question_id)
       question_dict = rc_questions[question_id]
@@ -83,7 +108,7 @@ class Task:
       model_output = runner.model_run_function(prompt)
       model_answer_id = get_answer_id_from_model_output(model_output)
 
-      if model_answer_id == answer_id:
+      if model_answer_id is not None and model_answer_id == answer_id:
         metrics['accuracy'] += 1
 
       model_outputs.append(model_output)
@@ -93,9 +118,10 @@ class Task:
     return TaskOutput(metrics, model_outputs, interpreted_outputs, input_codes)
 
   # returns a list of metrics, outputs
-  def run_task(self, model, config) -> TaskOutput:
+  def run_task(self, model: RunnableModel, config, cost_check_callback=None) -> TaskOutput:
     if self.type == TaskType.READING_COMPREHENSION:
-      return self.run_reading_comprehension(model, config)
+      log.info(f'Running reading comprehension on model {model._id}')
+      return self.run_reading_comprehension(model, config, cost_check_callback)
     else:
       raise NotImplementedError(f'Tried running an unsupported task type, {self.type}')
     pass
