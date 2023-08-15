@@ -8,6 +8,7 @@ from runnable_model_data import RunnableModel
 from model_data_loader import DatabaseConnector
 from run_config import Config
 from task_output import TaskOutput
+from model_runner import ModelRunner
 
 def only_free_cost_check_callback(cost: float):
   return cost == 0
@@ -31,7 +32,7 @@ def drive():
 
   for task in tasks_to_run:
     for model in evaluatable_models:
-      if task.is_model_applicable_for_the_task(model):
+      if not task.is_model_applicable_for_the_task(model):
         continue
       
       configs = [Config()]
@@ -41,12 +42,23 @@ def drive():
           print('None output')
           continue
         db_connector.save_run(model, task.type, 1, config, [task_output], timestamp)
-    
-
-
 
   time.sleep(60*60*24)
   pass
 
+
+def test_runner():
+  db_connector = DatabaseConnector()
+  evaluatable_models = db_connector.get_models_available_for_evaluating()
+  print(evaluatable_models)
+
+  configs = [Config()]
+  runner = ModelRunner(evaluatable_models[0], configs[0])
+  run_output = runner.run_model(["Hello,", 'Well then... I', "Why do you"])
+  print(run_output)
+
+
 if __name__ == '__main__':
+  #test_runner()
   drive()
+

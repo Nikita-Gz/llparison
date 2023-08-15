@@ -27,4 +27,7 @@ spec:
           requests:
             memory: "128Mi"
             cpu: "500m"
+        env:
+        - name: K8S_DEPLOYMENT
+          value: "1"
       terminationGracePeriodSeconds: 2

@@ -2,7 +2,9 @@
 
 import pandas as pd
 import pymongo
+from os import environ
 from typing import *
+import mongomock
 
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
@@ -12,25 +14,63 @@ class DatabaseConnector:
   columns_list = ['first_tracked_on', 'last_tracked_on', 'available', 'original_name', 'owner', 'name', 'price_prompt', 'ff_inference_api_supported', 'source', 'price_completion', 'context', 'prompt_limit', 'max_tokens_limit']
 
   def __init__(self) -> None:
-    #return
-    self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
+    # use a mock DB if the app is not on k8s
+
+    running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
+    if running_on_k8s:
+      self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
+    else:
+      self.mongo_client = mongomock.MongoClient()
+
     self.db = self.mongo_client["llparison_db"]
     self.models = self.db['models']
     self.experiments = self.db['experiments']
+
+    if not running_on_k8s:
+      self._fill_with_testing_stuff()
+
+
+  def _get_testing_models(self):
+    return [
+      {
+        '_id': 'hf:gpt2',
+        'owner': 'Open AI',
+        'name': 'gpt2',
+        'source': 'hf',
+        'first_tracked_on': 0,
+        'last_tracked_on': 1,
+        'tracking_history': [
+          {
+            'date': "Thisisadate",
+            'hf_inference_api_supported': True,
+            'available': True,
+            'context_size': 1000,
+            'price_prompt': 0,
+            'price_completion': 0,
+            'prompt_limit': 1000,
+            'max_tokens_limit': 1000,
+          }
+        ]
+      }
+    ]
+
+  
+  def _fill_with_testing_stuff(self):
+    self.models.insert_many(self._get_testing_models())
 
   # todo: verify columns?
 
   def get_models_available_for_evaluating(self) -> List[RunnableModel]:
 
     # todo: CHECK IF MODELS EXIST
-    assert self.models.count_documents() > 0, 'No models are present!'
+    assert self.models.count_documents({}) > 0, 'No models are present!'
 
     #models_to_evaluate
     # gets the latest date of tracking saved
     latest_tracking_date = self.models.aggregate([{
       '$project': {
         'last_tracked': {
-          '$max': 'tracking_history.date'
+          '$max': '$tracking_history.date'
         }
       }
     },
@@ -41,14 +81,20 @@ class DatabaseConnector:
     },
     {
       '$limit': 1
-    }])[0]['last_tracked']
+    }]).next()['last_tracked']
+
+    #[0]['last_tracked']
 
     # gets the model data at the last_tracked date
-    db_models = self.models.find({
-      'tracking_history.date': {'$eq': 1}
+    '''db_models = self.models.find({
+      'tracking_history.date': {'$eq': latest_tracking_date}
     },
     {
       'tracking_history.$': 1
+    })'''
+    # the one above uses positional projection, but it's not supported in mongomock
+    db_models = self.models.find({
+      'tracking_history.date': {'$eq': latest_tracking_date}
     })
 
     models_to_return = []

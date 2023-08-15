@@ -2,46 +2,71 @@
 
 import json
 import requests
-API_URL = "https://api-inference.huggingface.co/models/gpt2"
+import time
+import logging
+API_URL = "https://api-inference.huggingface.co/models/stabilityai/stablecode-instruct-alpha-3b"
 
 with open("./s/hf_read", 'r') as file:
   API_TOKEN = file.read()
 
+log = logging.getLogger("test.py")
+logging.basicConfig(level=logging.INFO)
+
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
-def query(payload):
+def _query_hf(payload, model_name='stabilityai/stablecode-instruct-alpha-3b') -> dict:
+  API_URL = 'https://api-inference.huggingface.co/models/' + model_name
   data = json.dumps(payload)
-  response = requests.request("POST", API_URL, headers=headers, data=data)
-  return json.loads(response.content.decode("utf-8"))
+  log.info(f'Sending HF the payload:\n{data[:100]}...')
+
+  while True:
+    response = requests.request("POST", API_URL, headers=headers, data=data)
+    response_txt = response.content.decode("utf-8")
+
+    # wait a portion of the estimated time if the model is loading
+    if response.status_code == 503:
+      wait_for = json.loads(response_txt)['estimated_time'] / 2
+      log.warning(f'Waiting for {wait_for}')
+      time.sleep(wait_for)
+    elif response.status_code != 200:
+      log.warning(f'Retrying HF request because of bad response ({response.status_code}): {response_txt}')
+      time.sleep(1)
+    else: # success
+      break
+
+  response_json = json.loads(response_txt)
+  log.info(f'Got response: {response_json}')
+  return response_json
+
 
 parameters = {
   'temperature': 1,
-  'top_p': 0.92,
-  'top_k': 500,
-  #'repetition_penalty': 1,
+  'top_p': 0.80,
+  'top_k': 50,
+  'repetition_penalty': 1.1,
   'return_full_text': False,
-  'max_new_tokens': 1,
+  'max_new_tokens': 50,
   'use_cache': False,
   'do_sample': True
 }
 inputs = "Q: But what am i supposed to do, captain Picard? You're not giving me many choices!\nPicard: "
-inputs = """
-Read the following text and answer the question:
-A grasshopper spent the summer hopping about in the sun and singing to his heart's content. One day, an ant went hurrying by, looking very hot and weary.
-"Why are you working on such a lovely day?" said the grasshopper.
-"I'm collecting food for the winter," said the ant, "and I suggest you do the same." And off she went, helping the other ants to carry food to their store. The grasshopper carried on hopping and singing. When winter came the ground was covered with snow. The grasshopper had no food and was hungry. So he went to the ants and asked for food.
-"What did you do all summer when we were working to collect our food?" said one of the ants.
-"I was busy hopping and singing," said the grasshopper.
-"Well," said the ant, "if you hop and sing all summer, and do no work, then you must starve in the winter."
+inputs = """Text:
+In the 16th century, an age of great marine and terrestrial exploration, Ferdinand Magellan led the first expedition to sail around the world. As a young Portuguese noble, he served the king of Portugal, but he became involved in the quagmire of political intrigue at court and lost the king’s favor. After he was dismissed from service by the king of Portugal, he offered to serve the future Emperor Charles V of Spain.
 
-Question: what is the topic of this text? Select the correct answer
-A) Importance of planning for the future
-B) Comedy
-C) Empathy of ants
-D) Nothing to do with the future
+A papal decree of 1493 had assigned all land in the New World west of 50 degrees W longitude to Spain and all the land east of that line to Portugal. Magellan offered to prove that the East Indies fell under Spanish authority. On September 20, 1519, Magellan set sail from Spain with five ships. More than a year later, one of these ships was exploring the topography of South America in search of a water route across the continent. This ship sank, but the remaining four ships searched along the southern peninsula of South America. Finally they found the passage they sought near 50 degrees S latitude. Magellan named this passage the Strait of All Saints, but today it is known as the Strait of Magellan.
 
-The correct answer is: 
-"""
-data = query({
+One ship deserted while in this passage and returned to Spain, so fewer sailors were privileged to gaze at that first panorama of the Pacific Ocean. Those who remained crossed the meridian now known as the International Date Line in the early spring of 1521 after 98 days on the Pacific Ocean. During those long days at sea, many of Magellan’s men died of starvation and disease.
+
+Later, Magellan became involved in an insular conflict in the Philippines and was killed in a tribal battle. Only one ship and 17 sailors under the command of the Basque navigator Elcano survived to complete the westward journey to Spain and thus prove once and for all that the world is round, with no precipice at the edge.
+Question: The 16th century was an age of which exploration?
+Options:
+A) none of the above
+B) land
+C) biological
+D) common man
+E) cosmic
+The correct answer is the letter: """
+
+data = _query_hf({
   "inputs": inputs,
   'parameters': parameters})
 
