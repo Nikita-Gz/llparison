@@ -33,9 +33,9 @@ class DatabaseConnector:
   def _get_testing_models(self):
     return [
       {
-        '_id': 'hf:gpt2',
-        'owner': 'Open AI',
-        'name': 'stabilityai/stablecode-instruct-alpha-3b',
+        '_id': 'hf::gpt2',
+        'owner': '',
+        'name': 'gpt2',
         'source': 'hf',
         'first_tracked_on': 0,
         'last_tracked_on': 1,

@@ -58,7 +58,16 @@ def test_runner():
   print(run_output)
 
 
+def test_runner_local():
+  model = RunnableModel('a', '', 'gpt2', 'hf', 1000, False, True, 0)
+  config = Config()
+  runner = ModelRunner(model, config)
+  run_output = runner.run_model(['Hello,']*5)
+  print(run_output)
+
+
 if __name__ == '__main__':
-  test_runner()
+  test_runner_local()
+  #test_runner()
   #drive()
 

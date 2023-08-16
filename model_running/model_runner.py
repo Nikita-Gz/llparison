@@ -11,6 +11,13 @@ import time
 import asyncio
 import aiohttp
 from typing import *
+import os
+
+models_cache = os.getcwd() + '/.hf/hfmodels/'
+idksomeothercache = os.getcwd() + '/.hf/hfother/'
+os.environ['TRANSFORMERS_CACHE'] = models_cache
+os.environ['HF_DATASETS_CACHE'] = idksomeothercache
+from transformers import pipeline
 
 from run_config import Config
 from runnable_model_data import RunnableModel
@@ -25,31 +32,64 @@ with open("./s/hf_read", 'r') as file:
 hf_headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
 
 
+# todo: account for different models needing inputs with "assistant"/"user" stuff
+
+
 class ModelRunner:
   def __init__(self, model: RunnableModel, config: Config) -> None:
     self.model = model
     self.config = config
 
     # todo: eeh think about hf inference failing if it's unavailable?
+    #self._model_run_function = None
+
+
+  def get_run_function(self):
     self._model_run_function = None
     if self.model.source == 'OpenRouter':
-      self._model_run_function = self.run_openrouter_payload
+      return self.run_openrouter_payload
     elif self.model.source == 'hf' and self.model.hf_inferable:
-      self._model_run_function = self.run_hf_inference_payload
+      return lambda payload: asyncio.run(self.run_hf_inference_payload(payload))
     elif self.model.source == 'hf' and not self.model.hf_inferable:
-      pass
+      return self.run_hf_local
     else:
       raise NotImplementedError(f"Running from source {self.model_source} is NYI")
 
 
+  def _get_local_model_if_exists(self) -> None:
+    pass
 
 
-  #def run_task_with_preprocessing(task):
-  #  pass
+  def run_hf_local(self, payload: Union[str, List[str]]) -> Union[str, List[str]]:
+    if self.model.owner != '':
+      model_name = self.model.owner + '/' + self.model.name
+    else:
+      model_name = self.model.name
+    model_pipeline = pipeline(model=model_name)
+
+    parameters_to_get_and_defaults = {
+      'temperature': 2.0,
+      'top_p': 0.99,
+      'top_k': 5000,
+      'max_new_tokens': 5,
+      'return_full_text': False,
+      'do_sample': True,
+    }
+    final_parameters = dict()
+
+    for key, default_value in parameters_to_get_and_defaults.items():
+      final_parameters[key] = self.config.get_parameter(key, default=default_value)
+
+    if isinstance(payload, str):
+      return model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
+    else: # list of payload str's
+      return [output[0]['generated_text'] for output in model_pipeline(text_inputs=payload, **final_parameters)]
+
+
   async def _query_hf_single(self, payload: Union[str, List], model_name: str, session) -> dict:
     MAX_RETRIES = 10
     retry_count = 0
-    API_URL = 'https://api-inference.huggingface.co/models/' + model_name
+    API_URL = '/'.join(['https://api-inference.huggingface.co/models', self.model.owner, self.model.name])
     data = json.dumps(payload)
 
     #payload_part_to_show = payload[:100]
@@ -86,7 +126,7 @@ class ModelRunner:
     #if payload_size > self.model.context_size:
     #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
     
-    return asyncio.run(self._model_run_function(payload))
+    return self.get_run_function()(payload)
 
 
   def run_openrouter_payload(self, payload) -> str:
@@ -125,13 +165,13 @@ class ModelRunner:
     async with aiohttp.ClientSession(connector=connector) as session:
       # run a single request if payload is a string, run a lot of requests if payload is a list
       if isinstance(payload, str):
-        hf_response = await self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, self.model.name, session)
+        hf_response = await self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, session)
         return hf_response
       elif isinstance(payload, list):
         hf_tasks = []
         for payload_item in payload:
           assert isinstance(payload_item, str), f'Unsupported payload element type: {type(payload)}'
-          hf_tasks.append(self._query_hf_single({'inputs': payload_item, 'parameters': final_parameters}, self.model.name, session))
+          hf_tasks.append(self._query_hf_single({'inputs': payload_item, 'parameters': final_parameters}, session))
         print('!')
         hf_responses = await asyncio.gather(*hf_tasks)
         return hf_responses

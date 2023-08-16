@@ -1,5 +1,7 @@
 .git/
 .venv/
 .model_tasks/
+.*
+!.gitignore
 s/
 __pycache__/
