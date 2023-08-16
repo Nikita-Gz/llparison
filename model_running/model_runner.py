@@ -30,37 +30,45 @@ class ModelRunner:
     self.model = model
     self.config = config
 
+    # todo: eeh think about hf inference failing if it's unavailable?
     self._model_run_function = None
     if self.model.source == 'OpenRouter':
       self._model_run_function = self.run_openrouter_payload
-    elif self.model.source == 'hf':
+    elif self.model.source == 'hf' and self.model.hf_inferable:
       self._model_run_function = self.run_hf_inference_payload
+    elif self.model.source == 'hf' and not self.model.hf_inferable:
+      pass
     else:
       raise NotImplementedError(f"Running from source {self.model_source} is NYI")
 
 
+
+
   #def run_task_with_preprocessing(task):
   #  pass
-  async def _query_hf_single(self, payload: str, model_name: str, session) -> dict:
+  async def _query_hf_single(self, payload: Union[str, List], model_name: str, session) -> dict:
     MAX_RETRIES = 10
     retry_count = 0
     API_URL = 'https://api-inference.huggingface.co/models/' + model_name
     data = json.dumps(payload)
-    log.info(f'Sending HF the payload:\n{payload}')
+
+    #payload_part_to_show = payload[:100]
+    #log.info(f'Sending HF the payload:\n{payload_part_to_show}')
+    log.info(f'Sending HF the payload')
 
     while retry_count <= MAX_RETRIES:
       retry_count += 1
       async with session.request("POST", API_URL, headers=hf_headers, data=data) as response:
         response_txt = await response.text()
 
-        # wait half the estimated time if the model is loading
-        if response.status == 503:
-          wait_for = json.loads(response_txt)['estimated_time'] / 2
+        # wait quarter the estimated time if the model is loading
+        if response.status == 503 and not response_txt == '{"error":"overloaded"}':
+          wait_for = json.loads(response_txt)['estimated_time'] / 4
           log.warning(f'Waiting for {wait_for}')
           time.sleep(wait_for)
         elif response.status != 200:
-          log.warning(f'Retrying HF request because of bad response ({response.status_code}): {response_txt}')
-          time.sleep(1)
+          log.warning(f'Retrying HF request because of bad response ({response.status}): {response_txt}')
+          time.sleep(10)
         else: # success
           response_json = json.loads(response_txt)
           log.info(f'Got response: {response_json}')
@@ -75,8 +83,8 @@ class ModelRunner:
 
     payload_size = self.count_tokens(payload)
     log.info(f'{payload_size} tokens')
-    if payload_size > self.model.context_size:
-      log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
+    #if payload_size > self.model.context_size:
+    #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
     
     return asyncio.run(self._model_run_function(payload))
 
@@ -86,7 +94,7 @@ class ModelRunner:
     return 'OpenRouter response. WIP'
 
 
-  async def run_multiple_payloads(self, payload, final_parameters):
+  '''async def run_multiple_payloads(self, payload, final_parameters):
     hf_responses = []
     hf_tasks = []
     for payload_item in payload:
@@ -94,6 +102,7 @@ class ModelRunner:
       hf_tasks.append(asyncio.Task(self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, self.model.name)))
     hf_responses = asyncio.gather(hf_tasks)
     return hf_responses
+  '''
 
 
   async def run_hf_inference_payload(self, payload: Union[str, List[str]]) -> Union[str, List[str]]:
@@ -112,7 +121,8 @@ class ModelRunner:
     for key, default_value in parameters_to_get_and_defaults.items():
       final_parameters[key] = self.config.get_parameter(key, default=default_value)
     
-    async with aiohttp.ClientSession() as session:
+    connector = aiohttp.TCPConnector(limit=16)
+    async with aiohttp.ClientSession(connector=connector) as session:
       # run a single request if payload is a string, run a lot of requests if payload is a list
       if isinstance(payload, str):
         hf_response = await self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, self.model.name, session)

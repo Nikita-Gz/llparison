@@ -35,7 +35,7 @@ class DatabaseConnector:
       {
         '_id': 'hf:gpt2',
         'owner': 'Open AI',
-        'name': 'gpt2',
+        'name': 'stabilityai/stablecode-instruct-alpha-3b',
         'source': 'hf',
         'first_tracked_on': 0,
         'last_tracked_on': 1,

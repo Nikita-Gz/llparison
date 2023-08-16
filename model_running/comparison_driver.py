@@ -54,11 +54,11 @@ def test_runner():
 
   configs = [Config()]
   runner = ModelRunner(evaluatable_models[0], configs[0])
-  run_output = runner.run_model(["Hello,", 'Well then... I', "Why do you"])
+  run_output = runner.run_model(["Hello,"] * 100)
   print(run_output)
 
 
 if __name__ == '__main__':
-  #test_runner()
-  drive()
+  test_runner()
+  #drive()
 
