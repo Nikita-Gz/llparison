@@ -28,7 +28,7 @@ def get_openrouter_models(tracking_date: str) -> Dict[str, Dict]:
       'first_tracked_on': tracking_date,
       'last_tracked_on': tracking_date,
       'available': None,
-      '_id': source + ':' + model['id'],
+      '_id': source + ':' + model['id'].split('/')[0] + ':' + model['id'].split('/')[1],
       'owner': model['id'].split('/')[0],
       'name': model['id'].split('/')[1],
       'price_prompt': model['pricing']['prompt'],
