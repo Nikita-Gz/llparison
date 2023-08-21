@@ -2,49 +2,86 @@
 
 {%block scripts%}
 <script>
-// jquery function
-$(document).ready(function(){
-        var ctx = document.getElementById('myChart').getContext('2d');
-        var myChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: [{% for name in qs.persons %}'{{name}}',{%endfor%}],
-                datasets: [{
-                    label: '# of users',
-                    data: [{%for val in qs.mesgs%}{{val}},{%endfor%}],
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.2)', 
-                        'rgba(54, 162, 235, 0.2)',
-                        'rgba(255, 206, 86, 0.2)',
-                        'rgba(75, 192, 192, 0.2)',
-                        'rgba(153, 102, 255, 0.2)',
-                        'rgba(255, 159, 64, 0.2)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true
+
+// charts
+{% for task_dict in model_data.task_ratings %}
+    $(document).ready(function(){
+            var ctx = document.getElementById('{{task_dict.task_name}}_chart').getContext('2d');
+            var myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [{% for metric in task_dict.metrics %}'{{task_dict.task_name}}: {{metric.name}}',{%endfor%}],
+                    datasets: [{
+                        label: 'Score',
+                        data: [{% for metric in task_dict.metrics %}{{metric.value}},{%endfor%}],
+                        borderWidth: 1,
+                        backgroundColor: palette('tol', {{qs|length}}).map(function(hex) {
+                            return '#' + hex;
+                        })
+                    }]
+                },
+                options: {
+                    scales: {
+                        yAxes: [{
+                            ticks: {
+                                beginAtZero: true
+                            }
+                        }]
                     }
                 }
-            }
-});
     });
+    });
+{% endfor %}
+
+// charts selector
+var selected_model_id = "{{selected_model}}"
 </script>
 {%endblock scripts%}
 
 {%block content%}
 <!-- displaying the chart -->
 <!-- you can also play around with the width and height to increase or decrease the chart size -->
-<canvas id="myChart" width="400" height="100"></canvas>  
+
+<div id='model_list'>
+<ul>
+    {% for model_name in model_data.models_list %}
+        <li>{{model_name}}</li>
+    {%endfor%}
+</ul>
+<br/>
+<label>Selected model: {{model_data.selected_model}}
+<br/>
+</div>
+
+<div id='parameters'>
+    {% for parameter_dict in model_data.filters %}
+        <label>{{parameter_dict.name}}: </label>
+        <select name="parameter_{{parameter_dict.name}}_selector" id="parameter_{{parameter_dict.name}}_selector">
+            {% for value in parameter_dict.values%}
+                {% if value == parameter_dict.default %}
+                    <option selected value="{{value}}">{{value}}</option>
+                {% else %}
+                    <option value="{{value}}">{{value}}</option>
+                {% endif %}
+            {% endfor %}
+        </select>
+        <br/>
+    {% endfor %}
+</div>
+
+<div id='error_message'>
+{% if model_data.evaluation_error_message %}
+<label>{{model_data.evaluation_error_message}}</label>
+{% endif %}
+</div>
+
+<!-- one chart per task -->
+<div id='ratings'>
+    {% for task_dict in model_data.task_ratings %}
+        <div id='{{model_data.selected_model}}_{{task_dict.task_name}}_chart'>
+        <h4>{{model_data.selected_model}} evaluation for {{task_dict.task_name}}</h4>
+        <canvas id="{{task_dict.task_name}}_chart" width="400" height="100"></canvas>
+        </div>
+    {% endfor %}
+</div>
 {%endblock content%}

@@ -41,47 +41,59 @@ def get_fake_experiment_result_dicts():
 
 
 def get_processed_dict_for_output():
-  single_model_dicts = [
-    {
-      'model_id': 'model1_id',
-      'evaluation_error_message': '',
-      'filters':
-      [
-        {
-          'name': 'temperature',
-          'values':
-          [
-            1.0, 0.5, 0.01
-          ],
-          'default': 1.0
-        },
-        {
-          'name': 'top-p',
-          'values':
-          [
-            0.2, 0.5, 0.9
-          ],
-          'default': 0.5
-        },
-      ],
-      'notes': '',
-      'task_ratings':
-      [
-        {
-          'task_name': 'Reading Comprehension',
-          'metrics':
-          [
-            {
-              'name': 'Accuracy',
-              'value': 0.34
-            },
-            {
-              'name': 'False Positives',
-              'value': 0.78
-            }
-          ]
-        }
-      ]
-    },
-  ]
-  return single_model_dicts
+  data_to_display ={
+    'models_list': ['model1_id'],
+    'selected_model': 'model1_id',
+    'evaluation_error_message': '',
+    'filters':
+    [
+      {
+        'name': 'temperature',
+        'values':
+        [
+          1.0, 0.5, 0.01
+        ],
+        'default': 1.0
+      },
+      {
+        'name': 'top-p',
+        'values':
+        [
+          0.2, 0.5, 0.9
+        ],
+        'default': 0.5
+      },
+    ],
+    'task_ratings':
+    [
+      {
+        'task_name': 'Reading Comprehension',
+        'metrics':
+        [
+          {
+            'name': 'Accuracy',
+            'value': 0.34
+          },
+          {
+            'name': 'False Positives',
+            'value': 0.78
+          }
+        ]
+      },
+      {
+        'task_name': 'Spam Detection',
+        'metrics':
+        [
+          {
+            'name': 'Accuracy',
+            'value': 0.7
+          },
+          {
+            'name': 'F1',
+            'value': 0.6
+          }
+        ]
+      }
+    ]
+  }
+  return data_to_display
