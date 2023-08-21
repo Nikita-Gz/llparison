@@ -70,11 +70,6 @@ class Task:
       return final_text
 
     runner = ModelRunner(model, config)
-    model_outputs = []
-    metrics = {'accuracy': 0}
-    interpreted_outputs = []
-    input_codes = []
-    errors = []
 
     # cost estimator
     # todo: make it a function
@@ -94,6 +89,12 @@ class Task:
       if not cost_is_appropriate:
         log.warning(f'Skipping model {model._id} because the cost is too high ({cost})')
         return None
+
+    model_outputs = []
+    metrics = {'accuracy': 0}
+    interpreted_outputs = []
+    input_codes = []
+    errors = []
 
     # evaluator. First - get model responses. Second - evaluate them
     # WIP - continue from here. Account for exceptions!

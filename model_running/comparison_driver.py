@@ -41,7 +41,7 @@ def drive():
         if task_output is None:
           print('None output')
           continue
-        db_connector.save_run(model, task.type, 1, config, [task_output], timestamp)
+        db_connector.save_run(model, task.type, 1, config, task_output, timestamp)
 
   time.sleep(60*60*24)
   pass
