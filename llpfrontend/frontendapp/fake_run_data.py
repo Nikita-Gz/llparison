@@ -41,59 +41,117 @@ def get_fake_experiment_result_dicts():
 
 
 def get_processed_dict_for_output():
-  data_to_display ={
-    'models_list': ['model1_id'],
-    'selected_model': 'model1_id',
-    'evaluation_error_message': '',
-    'filters':
-    [
-      {
-        'name': 'temperature',
-        'values':
-        [
-          1.0, 0.5, 0.01
-        ],
-        'default': 1.0
-      },
-      {
-        'name': 'top-p',
-        'values':
-        [
-          0.2, 0.5, 0.9
-        ],
-        'default': 0.5
-      },
-    ],
-    'task_ratings':
-    [
-      {
-        'task_name': 'Reading Comprehension',
-        'metrics':
-        [
-          {
-            'name': 'Accuracy',
-            'value': 0.34
-          },
-          {
-            'name': 'False Positives',
-            'value': 0.78
-          }
-        ]
-      },
-      {
-        'task_name': 'Spam Detection',
-        'metrics':
-        [
-          {
-            'name': 'Accuracy',
-            'value': 0.7
-          },
-          {
-            'name': 'F1',
-            'value': 0.6
-          }
-        ]
-      }
-    ]
+  general_data = {
+    'models_list': ['model1_id', 'model2_id'],
+    'selected_model': 'model1_id'
   }
-  return data_to_display
+  models_data = {
+    'model1_id': {
+      'evaluation_error_message': '',
+      'filters':
+      [
+        {
+          'name': 'temperature',
+          'values':
+          [
+            1.0, 0.5, 0.01
+          ],
+          'default': 1.0
+        },
+        {
+          'name': 'top-p',
+          'values':
+          [
+            0.2, 0.5, 0.9
+          ],
+          'default': 0.5
+        },
+      ],
+      'task_ratings':
+      [
+        {
+          'task_name': 'Reading Comprehension',
+          'metrics':
+          [
+            {
+              'name': 'Accuracy',
+              'value': 0.34
+            },
+            {
+              'name': 'False Positives',
+              'value': 0.78
+            }
+          ]
+        },
+        {
+          'task_name': 'Spam Detection',
+          'metrics':
+          [
+            {
+              'name': 'Accuracy',
+              'value': 0.7
+            },
+            {
+              'name': 'F1',
+              'value': 0.6
+            }
+          ]
+        }
+      ]
+    },
+
+    'model2_id': {
+      'evaluation_error_message': 'Ueueueue',
+      'filters':
+      [
+        {
+          'name': 'temperature',
+          'values':
+          [
+            1.0, 0.01
+          ],
+          'default': 0.01
+        },
+        {
+          'name': 'top-p',
+          'values':
+          [
+            0.2, 0.9
+          ],
+          'default': 0.9
+        },
+      ],
+      'task_ratings':
+      [
+        {
+          'task_name': 'Idk',
+          'metrics':
+          [
+            {
+              'name': 'Accuracy',
+              'value': 0.64
+            },
+            {
+              'name': 'False Positives',
+              'value': 0.48
+            }
+          ]
+        },
+        {
+          'task_name': 'Spam Detection',
+          'metrics':
+          [
+            {
+              'name': 'Accuracy',
+              'value': 0.78
+            },
+            {
+              'name': 'F1',
+              'value': 0.71
+            }
+          ]
+        }
+      ]
+    }
+  }
+  return general_data, models_data

@@ -4,37 +4,179 @@
 <script>
 
 // charts
-{% for task_dict in model_data.task_ratings %}
-    $(document).ready(function(){
-            var ctx = document.getElementById('{{task_dict.task_name}}_chart').getContext('2d');
-            var myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: [{% for metric in task_dict.metrics %}'{{task_dict.task_name}}: {{metric.name}}',{%endfor%}],
-                    datasets: [{
-                        label: 'Score',
-                        data: [{% for metric in task_dict.metrics %}{{metric.value}},{%endfor%}],
-                        borderWidth: 1,
-                        backgroundColor: palette('tol', {{qs|length}}).map(function(hex) {
-                            return '#' + hex;
-                        })
-                    }]
-                },
-                options: {
-                    scales: {
-                        yAxes: [{
-                            ticks: {
-                                beginAtZero: true
-                            }
-                        }]
+function make_barchart(element_id, labels_list, data_list) {
+    var ctx = document.getElementById(element_id).getContext('2d');
+    var myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels_list,
+            datasets: [{
+                label: 'Score',
+                data: data_list,
+                borderWidth: 1,
+                backgroundColor: palette('tol', labels_list.length).map(function(hex) {
+                    return '#' + hex;
+                })
+            }]
+        },
+        options: {
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        suggestedMin: 0,
+                        suggestedMax: 1,
+                        beginAtZero: true
                     }
-                }
-    });
-    });
-{% endfor %}
+                }]
+            }
+        }
+    })
+}
+
+function create_charts(response) {
+    task_ratings = response["task_ratings"]
+    charts_container = document.getElementById('charts')
+    charts_container.textContent = ""
+    new_elements = []
+    chart_creators = []
+    task_ratings.forEach((task) => {
+        task_name = task["task_name"]
+        metric_names = []
+        metric_values = []
+        task["metrics"].forEach((metric => {
+            metric_names.push(task_name + ": " + metric["name"])
+            metric_values.push(metric["value"])
+        }))
+
+        var chart_div = document.createElement('div')
+        charts_container.appendChild(chart_div)
+
+        var el = document.createElement('h4')
+        el.textContent = selected_model_id + " evaluation for " + task_name
+        chart_div.appendChild(el)
+
+        var el = document.createElement('canvas')
+        el.setAttribute('id', task_name + "_chart");
+        el.setAttribute('width', 400);
+        el.setAttribute('height', 100);
+        chart_div.appendChild(el)
+
+        make_barchart(task_name + "_chart", metric_names, metric_values)
+
+        //chart_creators.push(function () {make_barchart(task_name + "_chart", metric_names, metric_values)})
+    })
+
+    document.getElementById("error_message_label").textContent = response["evaluation_error_message"]
+
+    //chart_creators.forEach((creator) => {creator()})
+}
+
+var filters_array = []
+
+function create_filters(response) {
+    var filters_recieved = response["filters"]
+    filters_array = []
+    filters_container = document.getElementById('filters_div')
+    filters_container.textContent = ""
+    filters_recieved.forEach((filter) => {
+        var lbl = document.createElement('label')
+        lbl.textContent = filter["name"]
+        filters_container.appendChild(lbl)
+
+        var filter_selector = document.createElement('select')
+        selector_id = filter["name"] + "_filter"
+        filter_selector.setAttribute('id', selector_id);
+        filter_selector.setAttribute('name', filter["name"]);
+        filters_container.appendChild(filter_selector)
+
+        filter["values"].forEach((value) => {
+            var option = document.createElement('option')
+            option.setAttribute('value', value);
+            option.textContent = value
+            if (value === filter["default"]) {
+                option.setAttribute('selected', "");
+            }
+            filter_selector.appendChild(option)
+        })
+        filters_container.appendChild(document.createElement('br'))
+        filters_array.push(filter_selector)
+    })
+}
+
+function apply_filters() {
+    filters_data = {}
+    filters_array.forEach((filterNode) => {
+        filters_data["filter_" + filterNode.name] = filterNode.value
+    })
+
+    filters_data["single_model_id"] = selected_model_id
+
+    $.ajax({
+        url: "{% url 'comparisons_single_model_data' %}",
+        type: "GET", //send it through get method
+        dataType: "json",
+        data: filters_data,
+        success: function(response) {
+            create_charts(response)
+        },
+        error: function(xhr) {
+            alert(xhr)
+        }
+      });
+}
 
 // charts selector
-var selected_model_id = "{{selected_model}}"
+var selected_model_id = "{{general_data.selected_model}}"
+$(document).ready(function(){model_list_click_handler(selected_model_id)})
+
+// models list
+var model_list_elements = []
+function update_selected_model_highlighter() {
+    model_list_elements.forEach((element) => {
+        if (element.id === (selected_model_id + "_list_item")) {
+            element.style.textDecoration = "underline";
+        } else {
+            element.style.textDecoration = "none";
+        }
+    });
+    document.getElementById("selected_model_label").textContent = "Selected model: " + selected_model_id
+}
+
+function process_single_model_data_response(response) {
+    create_charts(response)
+    create_filters(response)
+    // create_charts
+}
+
+function model_list_click_handler(model_name) {
+    selected_model_id = model_name
+    update_selected_model_highlighter()
+
+    $.ajax({
+        url: "{% url 'comparisons_single_model_data' %}",
+        type: "GET", //send it through get method
+        dataType: "json",
+        data: { 
+          single_model_id: model_name
+        },
+        success: function(response) {
+            process_single_model_data_response(response)
+        },
+        error: function(xhr) {
+            alert(xhr)
+        }
+      });
+
+  }
+$(document).ready(function(){
+    {% for model_name in general_data.models_list %}
+        var element = document.getElementById("{{model_name}}_list_item")
+        element.addEventListener("click", function(){ model_list_click_handler("{{model_name}}"); });
+        model_list_elements.push(element)
+    {%endfor%}
+})
+$(document).ready(update_selected_model_highlighter)
+
 </script>
 {%endblock scripts%}
 
@@ -44,44 +186,34 @@ var selected_model_id = "{{selected_model}}"
 
 <div id='model_list'>
 <ul>
-    {% for model_name in model_data.models_list %}
-        <li>{{model_name}}</li>
+    {% for model_name in general_data.models_list %}
+        <li id="{{model_name}}_list_item">{{model_name}}</li>
     {%endfor%}
 </ul>
 <br/>
-<label>Selected model: {{model_data.selected_model}}
+<label id='selected_model_label'>Selected model: {{general_data.selected_model}}</label>
 <br/>
 </div>
 
-<div id='parameters'>
-    {% for parameter_dict in model_data.filters %}
-        <label>{{parameter_dict.name}}: </label>
-        <select name="parameter_{{parameter_dict.name}}_selector" id="parameter_{{parameter_dict.name}}_selector">
-            {% for value in parameter_dict.values%}
-                {% if value == parameter_dict.default %}
-                    <option selected value="{{value}}">{{value}}</option>
-                {% else %}
-                    <option value="{{value}}">{{value}}</option>
-                {% endif %}
-            {% endfor %}
-        </select>
-        <br/>
-    {% endfor %}
+<div>
+<div id='filters_div'>
+</div>
+<button type="button" onclick="apply_filters()">Apply filters</button>
 </div>
 
 <div id='error_message'>
-{% if model_data.evaluation_error_message %}
-<label>{{model_data.evaluation_error_message}}</label>
-{% endif %}
+<label id='error_message_label'>{{model_data.evaluation_error_message}}</label>
 </div>
 
 <!-- one chart per task -->
-<div id='ratings'>
+<div id='charts'>
+<!-- 
     {% for task_dict in model_data.task_ratings %}
         <div id='{{model_data.selected_model}}_{{task_dict.task_name}}_chart'>
         <h4>{{model_data.selected_model}} evaluation for {{task_dict.task_name}}</h4>
         <canvas id="{{task_dict.task_name}}_chart" width="400" height="100"></canvas>
         </div>
     {% endfor %}
+-->
 </div>
 {%endblock content%}
