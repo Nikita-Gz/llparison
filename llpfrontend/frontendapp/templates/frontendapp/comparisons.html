@@ -37,6 +37,13 @@ function create_charts(response) {
     task_ratings = response["task_ratings"]
     charts_container = document.getElementById('charts')
     charts_container.textContent = ""
+
+    if (task_ratings.length == 0) {
+        var no_charts = document.createElement('label')
+        no_charts.textContent = "No charts :c"
+        charts_container.appendChild(no_charts)
+    }
+
     new_elements = []
     chart_creators = []
     task_ratings.forEach((task) => {
