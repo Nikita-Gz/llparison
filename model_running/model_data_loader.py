@@ -111,7 +111,7 @@ class DatabaseConnector:
     return models_to_return
   
 
-  def save_run(self, model: RunnableModel, task_type: int, iterations: int, config: Config, experiment_outputs: List[TaskOutput], experiment_date: str):
+  def save_run(self, model: RunnableModel, task_type: int, iterations: int, config: Config, experiment_result: TaskOutput, experiment_date: str):
     # todo: redo to use saving of several runs in one experiment
     experiment_dict = {
       'date': experiment_date,
@@ -120,10 +120,10 @@ class DatabaseConnector:
       'config': config.to_dict(),
       'notes': '',
       'task_type': task_type,
-      'metrics': [output.metrics for output in experiment_outputs],
-      'model_outputs': [output.model_outputs for output in experiment_outputs],
-      'interpreted_outputs': [output.interpreted_outputs for output in experiment_outputs],
-      'input_codes': [output.input_codes for output in experiment_outputs],
+      'metrics': experiment_result.metrics,
+      'model_outputs': experiment_result.model_outputs,
+      'interpreted_outputs': experiment_result.interpreted_outputs,
+      'input_codes': experiment_result.input_codes,
     }
     self.experiments.insert_one(experiment_dict)
 
