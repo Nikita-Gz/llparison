@@ -126,7 +126,14 @@ class ModelRunner:
     #if payload_size > self.model.context_size:
     #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
     
-    return self.get_run_function()(payload)
+    if self.model.source == 'OpenRouter':
+      return self.run_openrouter_payload(payload)
+    elif self.model.source == 'hf' and self.model.hf_inferable:
+      return lambda payload: asyncio.run(self.run_hf_inference_payload(payload))
+    elif self.model.source == 'hf' and not self.model.hf_inferable:
+      return self.run_hf_local(payload)
+    else:
+      raise NotImplementedError(f"Running from source {self.model_source} is NYI")
 
 
   def run_openrouter_payload(self, payload) -> str:
