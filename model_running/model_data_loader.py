@@ -5,6 +5,7 @@ import pymongo
 from os import environ
 from typing import *
 import mongomock
+import json
 
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
@@ -111,21 +112,73 @@ class DatabaseConnector:
     return models_to_return
   
 
+  def _make_run_id(self, model: RunnableModel, task_type: int, config: Config, experiment_date: str):
+    experiment_id = str(task_type) + str(model._id) + json.dumps(config.to_dict()) + experiment_date
+    return experiment_id
+  
+
+  def create_experiment_stump(self, model: RunnableModel, task_type: int, config: Config, experiment_date: str):
+    experiment_dict = {
+      '_id': self._make_run_id(model, task_type, config, experiment_date),
+      'date': experiment_date,
+      'finished': False,
+      'too_expensive': False,
+      'model_id': model._id,
+      'iterations': 1,
+      'config': config.to_dict(),
+      'notes': '',
+      'task_type': task_type,
+      'metrics': {},
+      'outputs': []
+    }
+    self.experiments.insert_one(experiment_dict)
+
+
+  def get_unfinished_experiments(self) -> List[Dict]:
+    return list(self.experiments.find({'finished': False}))
+
+
+  def mark_experiment_as_finished(self, _id, too_expensive):
+    self.experiments.update_one({'_id': _id}, {'finished': True, 'too_expensive': too_expensive})
+
+
+  def get_latest_experiment_for_model_and_task_and_config(self, model_id) -> dict:
+    # СУКА В ПИЗДУ, НАДО СРАЗУ И МОДЕЛИ И ВСЁ ТРЕКАТЬ ИЛИ ОЦЕНИВАТЬ ИОЛИОЛИВО ЫОВ
+    pass
+
+
+  def append_output_to_experiment(self, experiment_id, output):
+    self.experiments.update_one(
+      {'_id': experiment_id},
+      {'$push': {'outputs': output}})
+
+
   def save_run(self, model: RunnableModel, task_type: int, iterations: int, config: Config, experiment_result: TaskOutput, experiment_date: str):
     # todo: redo to use saving of several runs in one experiment
     experiment_dict = {
+      '_id': self._make_run_id(model, task_type, config, experiment_date),
       'date': experiment_date,
+      'finished': True,
+      'too_expensive': False,
       'model_id': model._id,
       'iterations': iterations,
       'config': config.to_dict(),
       'notes': '',
       'task_type': task_type,
       'metrics': experiment_result.metrics,
-      'model_outputs': experiment_result.model_outputs,
-      'interpreted_outputs': experiment_result.interpreted_outputs,
-      'input_codes': experiment_result.input_codes,
+      'outputs': []
     }
+    for model_output, interpreted_output, input_code in zip(
+      experiment_result.model_outputs,
+      experiment_result.interpreted_outputs,
+      experiment_result.input_codes
+    ):
+      experiment_dict['outputs'].append({
+        'model_output': model_output,
+        'interpreted_output': interpreted_output,
+        'input_code': input_code})
     self.experiments.insert_one(experiment_dict)
+
 
   # saves new model if it is not tracked yet, adds one tracking entry if it is
   def save_model_tracking_properly(self, model_dict, dt):
