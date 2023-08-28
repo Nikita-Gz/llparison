@@ -194,10 +194,8 @@ class ModelRunner:
     if isinstance(payloads, str):
       token_count += len(tokenizer.encode(payloads))
     elif isinstance(payloads, list):
-      for payload in payloads:
-        assert isinstance(payload, str), f'Payload {payload} is not int but a {type(payload)}'
-        token_count += len(tokenizer.encode(payload))
+      token_count += sum([len(count) for count in tokenizer.encode_batch(payloads)])
     else:
-      raise TypeError(f'Payloads have unsupported type of {type(payload)}')
+      raise TypeError(f'Payload has unsupported type of {type(payloads)}')
     
     return token_count
