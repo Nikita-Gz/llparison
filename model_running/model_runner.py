@@ -21,7 +21,7 @@ from transformers import pipeline
 
 from run_config import Config
 from runnable_model_data import RunnableModel
-
+from eval_results_callback import EvaluationResultsCallback
 
 log = logging.getLogger("task.py")
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +60,7 @@ class ModelRunner:
     pass
 
 
-  def run_hf_local(self, payload: Union[str, List[str]]) -> Union[str, List[str]]:
+  def run_hf_local(self, payloads: Dict[str, str], callback: EvaluationResultsCallback) -> Union[str, List[str]]:
     if self.model.owner != '':
       model_name = self.model.owner + '/' + self.model.name
     else:
@@ -80,13 +80,12 @@ class ModelRunner:
     for key, default_value in parameters_to_get_and_defaults.items():
       final_parameters[key] = self.config.get_parameter(key, default=default_value)
 
-    if isinstance(payload, str):
-      return model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
-    else: # list of payload str's
-      return [output[0]['generated_text'] for output in model_pipeline(text_inputs=payload, **final_parameters)]
+    for input_code, payload in payloads.items():
+      generated_text = model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
+      callback.record_output(generated_text, input_code=input_code)
 
 
-  async def _query_hf_single(self, payload: Union[str, List], model_name: str, session) -> dict:
+  async def _query_hf_single(self, payload: Union[str, List], input_code: str, callback: EvaluationResultsCallback, session) -> dict:
     MAX_RETRIES = 10
     retry_count = 0
     API_URL = '/'.join(['https://api-inference.huggingface.co/models', self.model.owner, self.model.name])
@@ -112,31 +111,33 @@ class ModelRunner:
         else: # success
           response_json = json.loads(response_txt)
           log.info(f'Got response: {response_json}')
+          callback.record_output(response_json[0]['generated_text'], input_code=input_code)
           return response_json
+    
+    log.warning(f'Could not run input code {input_code} on URL {API_URL}')
 
-    raise TimeoutError(f"Model {model_name} took too many attempts to reply")
 
-
-  def run_model(self, payload: Union[str, List[str]]) -> Union[str, List[str]]:
+  # payloads - dict of {input_key: prompt}
+  def run_model(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
     # give a warning if the prompt is > context size
     log.info(f'Running model {self.model._id}')
 
-    payload_size = self.count_tokens(payload)
+    payload_size = self.count_tokens(list(payloads.value()))
     log.info(f'{payload_size} tokens')
     #if payload_size > self.model.context_size:
     #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
     
     if self.model.source == 'OpenRouter':
-      return self.run_openrouter_payload(payload)
+      self.run_openrouter_payload(payloads, callback)
     elif self.model.source == 'hf' and self.model.hf_inferable:
-      return lambda payload: asyncio.run(self.run_hf_inference_payload(payload))
+      asyncio.run(self.run_hf_inference_payload(payloads, callback))
     elif self.model.source == 'hf' and not self.model.hf_inferable:
-      return self.run_hf_local(payload)
+      self.run_hf_local(payloads, callback)
     else:
       raise NotImplementedError(f"Running from source {self.model_source} is NYI")
 
 
-  def run_openrouter_payload(self, payload) -> str:
+  def run_openrouter_payload(self, payloads, callback: EvaluationResultsCallback) -> str:
     raise NotImplementedError('Openrouter is WIP')
     return 'OpenRouter response. WIP'
 
@@ -152,7 +153,7 @@ class ModelRunner:
   '''
 
 
-  async def run_hf_inference_payload(self, payload: Union[str, List[str]]) -> Union[str, List[str]]:
+  async def run_hf_inference_payload(self, payloads: Dict[str, str], callback: EvaluationResultsCallback) -> Union[str, List[str]]:
     parameters_to_get_and_defaults = {
       'temperature': 0.0000001,
       'top_p': 0.92,
@@ -170,20 +171,12 @@ class ModelRunner:
     
     connector = aiohttp.TCPConnector(limit=16)
     async with aiohttp.ClientSession(connector=connector) as session:
-      # run a single request if payload is a string, run a lot of requests if payload is a list
-      if isinstance(payload, str):
-        hf_response = await self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, session)
-        return hf_response
-      elif isinstance(payload, list):
-        hf_tasks = []
-        for payload_item in payload:
-          assert isinstance(payload_item, str), f'Unsupported payload element type: {type(payload)}'
-          hf_tasks.append(self._query_hf_single({'inputs': payload_item, 'parameters': final_parameters}, session))
-        print('!')
-        hf_responses = await asyncio.gather(*hf_tasks)
-        return hf_responses
-      else:
-        raise TypeError(f'Unsupported payload type: {type(payload)}')
+      # run a lot of requests
+      hf_tasks = []
+      for input_code, payload in payloads.items():
+        assert isinstance(payload, str), f'Unsupported payload element type: {type(payload)}'
+        hf_tasks.append(self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, input_code, callback, session))
+      asyncio.gather(hf_tasks)
 
 
   def count_tokens(self, payloads: Union[str, List[str]]) -> int:

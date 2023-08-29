@@ -6,6 +6,7 @@ from os import environ
 from typing import *
 import mongomock
 import json
+import datetime
 
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
@@ -55,7 +56,44 @@ class DatabaseConnector:
       }
     ]
 
+
+  def _check_if_experiment_matches_config(
+      self,
+      experiment: dict,
+      config: Config) -> bool:
+    return experiment['config'] == config
+
   
+  def get_latest_evaluation_for_combination(
+      self,
+      model: RunnableModel,
+      task_name: str,
+      config: Config) -> Union[Dict, None]:
+    latest_experiment = None
+    model_task_experiments = self.experiments.find({
+      'model_id': model._id,
+      'task_type': task_name,
+      'finished': True,
+      'too_expensive': False,
+      })
+    experiments_with_matching_configs = [
+      experiment for experiment in model_task_experiments
+      if self._check_if_experiment_matches_config(experiment, config)
+    ] # type: List[Dict]
+
+    # finds the latest experiment
+    for experiment in experiments_with_matching_configs:
+      current_experiment_date = experiment['date']
+      latest_experiment_date = latest_experiment['date']
+      #date = datetime.datetime.strptime(date)
+      current_date = datetime.datetime.strptime(current_experiment_date)
+      latest_date = datetime.datetime.strptime(latest_experiment_date)
+      if latest_experiment is None or current_date > latest_date:
+        latest_experiment = current_date
+    
+    return latest_experiment
+
+
   def _fill_with_testing_stuff(self):
     self.models.insert_many(self._get_testing_models())
 
@@ -112,14 +150,15 @@ class DatabaseConnector:
     return models_to_return
   
 
-  def _make_run_id(self, model: RunnableModel, task_type: int, config: Config, experiment_date: str):
+  def _make_run_id(self, model: RunnableModel, task_type: str, config: Config, experiment_date: str):
     experiment_id = str(task_type) + str(model._id) + json.dumps(config.to_dict()) + experiment_date
     return experiment_id
   
 
-  def create_experiment_stump(self, model: RunnableModel, task_type: int, config: Config, experiment_date: str):
+  def create_experiment_stump(self, model: RunnableModel, task_type: str, config: Config, experiment_date: str) -> str:
+    experiment_id = self._make_run_id(model, task_type, config, experiment_date),
     experiment_dict = {
-      '_id': self._make_run_id(model, task_type, config, experiment_date),
+      '_id': experiment_id,
       'date': experiment_date,
       'finished': False,
       'too_expensive': False,
@@ -131,26 +170,50 @@ class DatabaseConnector:
       'metrics': {},
       'outputs': []
     }
-    self.experiments.insert_one(experiment_dict)
+    result = self.experiments.insert_one(experiment_dict)
+    assert result.inserted_id is not None, f'Failed inserting ID {experiment_id}'
+    return experiment_id
 
 
-  def get_unfinished_experiments(self) -> List[Dict]:
-    return list(self.experiments.find({'finished': False}))
+  def get_unfinished_experiments(self, task_type: str) -> List[Dict]:
+    return list(self.experiments.find({
+      'task_type': task_type,
+      'finished': False}))
+
+
+  def get_experiments_from_id(self, experiment_id: str) -> Dict:
+    return self.experiments.find({'_id': experiment_id})
 
 
   def mark_experiment_as_finished(self, _id, too_expensive):
     self.experiments.update_one({'_id': _id}, {'finished': True, 'too_expensive': too_expensive})
 
 
-  def get_latest_experiment_for_model_and_task_and_config(self, model_id) -> dict:
-    # СУКА В ПИЗДУ, НАДО СРАЗУ И МОДЕЛИ И ВСЁ ТРЕКАТЬ ИЛИ ОЦЕНИВАТЬ ИОЛИОЛИВО ЫОВ
-    pass
+  def get_model_from_id(self, _id) -> Union[RunnableModel, None]:
+    model_obj = self.models.find({'_id': _id})
+    if model_obj is None:
+      return None
+    return RunnableModel(
+        _id=model_obj['_id'],
+        owner=model_obj['owner'],
+        name=model_obj['name'],
+        source=model_obj['source'],
+        context_size=model_obj['tracking_history'][0]['context_size'],
+        hf_inferable=model_obj['tracking_history'][0]['hf_inference_api_supported'],
+        available=model_obj['tracking_history'][0]['available'],
+        price=model_obj['tracking_history'][0]['price_completion'])
 
 
   def append_output_to_experiment(self, experiment_id, output):
     self.experiments.update_one(
       {'_id': experiment_id},
       {'$push': {'outputs': output}})
+
+
+  def set_metrics_to_experiment(self, experiment_id, metrics):
+    self.experiments.update_one(
+      {'_id': experiment_id},
+      {'$set': {'metrics': metrics}})
 
 
   def save_run(self, model: RunnableModel, task_type: int, iterations: int, config: Config, experiment_result: TaskOutput, experiment_date: str):

@@ -1,6 +1,9 @@
 class Config:
-  def __init__(self) -> None:
-    self._parameters = dict()
+  def __init__(self, parameters_dict=None) -> None:
+    if parameters_dict is None:
+      self._parameters = dict
+    else:
+      self._parameters = parameters_dict
 
   def set_parameter(self, key, value):
     self._parameters[key] = value
