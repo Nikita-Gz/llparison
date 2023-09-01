@@ -27,31 +27,41 @@ def get_openrouter_models(tracking_date: str) -> Dict[str, Dict]:
     model_data = {
       'first_tracked_on': tracking_date,
       'last_tracked_on': tracking_date,
-      'available': None,
       '_id': source + ':' + model['id'].split('/')[0] + ':' + model['id'].split('/')[1],
       'owner': model['id'].split('/')[0],
       'name': model['id'].split('/')[1],
-      'price_prompt': model['pricing']['prompt'],
-      'hf_inference_api_supported': False,
       'source': 'OpenRouter',
-      'price_completion': model['pricing']['completion'],
-      'context': model['context_length'],
-      'prompt_limit': model['input_limits']['prompt_tokens'],
-      'max_tokens_limit': model['input_limits']['max_tokens'],
+      'tracking_history': [
+        {
+          'date': tracking_date,
+          'hf_inference_api_supported': False,
+          'available': None,
+          'context_size': model['context_length'],
+          'price_prompt': model['pricing']['prompt'],
+          'price_completion': model['pricing']['completion'],
+          'prompt_limit': model['input_limits']['prompt_tokens'],
+          'max_tokens_limit': model['input_limits']['max_tokens']
+        }
+      ]
     }
     #assert set(model_data.keys()) == set(DatabaseConnector.columns_list)
     formatted_models.append(model_data)
-  
+  log.info(f'Got {len(formatted_models)} models from OpenRouter')
   return formatted_models
 
 
-def scan_for_trackable_models(tracking_date: str) -> pd.DataFrame:
-  empty_df = pd.DataFrame(columns=DatabaseConnector.columns_list)
+def scan_for_new_models(tracking_date: str, db_connector: DatabaseConnector) -> List[Dict]:
   openrouter_df = get_openrouter_models(tracking_date)
+  # scan for other models here too
 
-  total_df = pd.concat([empty_df, openrouter_df], ignore_index=True)
-
-  return total_df
+  currently_found_models = [] + openrouter_df
+  previously_unknown_models = []
+  previously_known_models_ids = [model['_id'] for model in list(db_connector.get_models())]
+  for currently_found_model in currently_found_models:
+    if currently_found_model['_id'] not in previously_known_models_ids:
+      previously_unknown_models.append(currently_found_model)
+  
+  return previously_unknown_models
 
 
 def check_availability_if_applicable(models_list: pd.DataFrame) -> pd.Series:
@@ -63,6 +73,64 @@ def check_availability_if_applicable(models_list: pd.DataFrame) -> pd.Series:
   
   availability_series = models_list.apply(availability_check)
   return availability_series
+
+
+def update_hf_model(model: Dict, db_connector: DatabaseConnector, tracking_date: str):
+  tracking_history = model['tracking_history']
+  id = model['_id']
+  if len(tracking_history) == 0:
+    # todo: there should be an API call to check for inferability, as well as the ability to download it
+    db_connector.save_model_tracking_properly(
+      {
+        '_id': id,
+        'hf_inference_api_supported': False,
+        'available': True,
+        'context_size': 2000,
+        'price_prompt': 0,
+        'price_completion': 0,
+        'prompt_limit': 0,
+        'max_tokens_limit': 0
+      },
+      tracking_date)
+  else:
+    log.info(f'Skipping tracking HF model {id} because it was already tracked')
+
+
+def update_openrouter_models(models: List[Dict], db_connector: DatabaseConnector, tracking_date: str):
+  currently_available_models = get_openrouter_models(tracking_date)
+  currently_available_models_dict = {model['_id']:model for model in currently_available_models}
+  #ids_of_models_to_update = [model['_id'] for model in models]
+
+  for model_to_update in models:
+    if model_to_update['_id'] in currently_available_models_dict.keys():
+      db_connector.save_model_tracking_properly(
+        currently_available_models_dict[model_to_update['_id']]['tracking_history'][0],
+        tracking_date)
+
+
+
+def update_existing_models_tracking(tracking_date: str, db_connector: DatabaseConnector):
+  all_models = list(db_connector.get_models())
+  log.info(f'Updating {len(all_models)} models')
+
+  # huggingface updates
+  for model in all_models:
+    if model['source'] == 'hf':
+      update_hf_model(model)
+  
+  # openrouter updates
+  update_openrouter_models([model for model in all_models if model['source'] == 'OpenRouter'], db_connector, tracking_date)
+
+
+def reworked_perform_tracking(tracking_date: str):
+  db = DatabaseConnector()
+
+  previously_unknown_models = scan_for_new_models(tracking_date, db)
+  db.save_models(previously_unknown_models)
+
+  update_existing_models_tracking(tracking_date, db)
+
+
 
 
 def perform_tracking(tracking_date: str):

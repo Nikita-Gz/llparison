@@ -19,6 +19,11 @@ class DatabaseConnector:
   def get_model_if_exists(self, _id: str):
     return self.models.find_one(_id)
   
+
+  def save_models(self, models_dicts: List[Dict]):
+    self.models.insert_many(models_dicts)
+
+
   # saves new model if it is not tracked yet, adds one tracking entry if it is
   def save_model_tracking_properly(self, model_dict, dt):
     _id = model_dict['_id']
