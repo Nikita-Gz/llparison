@@ -2,13 +2,30 @@
 
 import pandas as pd
 import pymongo
+import json
 from os import environ
 from typing import *
 import mongomock
 import logging
 
+from .fake_run_data import get_fake_testing_evaluations
+
 log = logging.getLogger("data_handling.py")
 logging.basicConfig(level=logging.INFO)
+
+RC_TEXTS = None # type: Dict[str, str]
+RC_QUESTIONS = None # type: Dict[str, Dict]
+
+def _load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
+  global RC_TEXTS
+  global RC_QUESTIONS
+  log.info('Loading RC dataset')
+  with open("../model_tasks/rc/rc_dataset.txt", 'r') as file:
+    dataset = json.load(file)
+  RC_TEXTS = dataset['texts']
+  RC_QUESTIONS = dataset['questions']
+_load_raw_reading_comprehension_data()
+
 
 class DatabaseConnector:
   columns_list = ['first_tracked_on', 'last_tracked_on', 'available', 'original_name', 'owner', 'name', 'price_prompt', 'ff_inference_api_supported', 'source', 'price_completion', 'context', 'prompt_limit', 'max_tokens_limit']
@@ -30,68 +47,48 @@ class DatabaseConnector:
       self._fill_with_testing_stuff()
 
 
-  def _get_testing_evaluations(self):
-    return [
-      {
-        #'_id': uuid4().int,
-        'date': '2023-01-02',
-        'model_id': 'hf::gpt2',
-        'iterations': 2,
-        'config': {'temperature': 1.0, 'top-p': 0.5},
-        'notes': '',
-        'task_type': 'Reading Comprehension',
-        'metrics': {'accuracy': 0.65, 'f1': 0.6},
-      },
-      {
-        #'_id': uuid4().int,
-        'date': '2023-01-03',
-        'model_id': 'hf::gpt2',
-        'iterations': 2,
-        'config': {'temperature': 1.0, 'top-p': 0.5},
-        'notes': '',
-        'task_type': 'Reading Comprehension',
-        'metrics': {'accuracy': 0.75, 'f1': 0.7},
-      },
-      {
-        #'_id': uuid4().int,
-        'date': '2023-01-02',
-        'model_id': 'hf::gpt2',
-        'iterations': 2,
-        'config': {'temperature': 0.01, 'top-p': 0.5},
-        'notes': '',
-        'task_type': 'Reading Comprehension',
-        'metrics': {'accuracy': 0.75, 'f1': 0.7},
-      },
-      {
-        #'_id': uuid4().int,
-        'date': '2023-01-02',
-        'model_id': 'hf::gpt2',
-        'iterations': 2,
-        'config': {'temperature': 0.01, 'top-p': 0.5, 'testparam': 1},
-        'notes': '',
-        'task_type': 'Reading Comprehension',
-        'metrics': {'accuracy': 0.75, 'f1': 0.7},
-      },
-      {
-        #'_id': uuid4().int,
-        'date': '2023-01-02',
-        'model_id': 'hf::idkanymoreplshelp',
-        'iterations': 2,
-        'config': {'temperature': 1},
-        'notes': '',
-        'task_type': 'Reading Comprehension',
-        'metrics': {'accuracy': 0.75, 'f1': 0.7},
-      },
-    ]
+  def _get_fake_testing_evaluations(self):
+    return get_fake_testing_evaluations()
 
   
   def _fill_with_testing_stuff(self):
-    testing_evals = self._get_testing_evaluations()
+    testing_evals = self._get_fake_testing_evaluations()
     inserted_ids = self.experiments.insert_many(testing_evals).inserted_ids
     assert len(inserted_ids) == len(testing_evals)
 
 
-  def get_unique_models_with_evaluations(self) -> list:
+  def get_unique_task_types(self) -> list:
+    unique_tasks = self.experiments.distinct("task_type")
+    return list(unique_tasks)
+
+
+  def get_evaluations_for_llm_config_task_combination(self, task_type: str, combination: Dict):
+    experiments_matching_model = list(self.experiments.find({
+      'task_type': task_type,
+      'model_id': combination['model_id']}))
+    config_to_look_for = combination['config']
+    experiments_matching_models_and_configs = [
+      experiment for experiment in experiments_matching_model
+      if experiment['config'] == config_to_look_for
+    ]
+    return experiments_matching_models_and_configs
+
+
+  def get_evaluations_for_llm_config_task_combinations(self, task_type: str, combinations: List[Dict]):
+    experiments_matching_models = list(self.experiments.find({
+      'task_type': task_type,
+      'model_id': {'$in': [combination['model_id'] for combination in combinations]}
+    }))
+
+    configs_to_look_for = [combination['config'] for combination in combinations]
+    experiments_matching_models_and_configs = [
+      experiment for experiment in experiments_matching_models
+      if experiment['config'] in configs_to_look_for
+    ]
+    return experiments_matching_models_and_configs
+
+
+  def get_unique_model_ids_with_evaluations(self) -> list:
     # unique model - unique by id, present in experiments
     #return pd.DataFrame(columns=self.columns_list)
     unique_models = self.experiments.distinct("model_id")
@@ -101,6 +98,15 @@ class DatabaseConnector:
   def get_evaluations_for_model(self, model_id) -> list:
     evaluations = self.experiments.find({'model_id': model_id})
     return list(evaluations)
+
+
+def get_unique_input_codes_from_evaluations(evaluations: List[Dict]) -> List[str]:
+  all_codes = set()
+  for evaluation in evaluations:
+    codes = set([output['input_code'] for output in evaluation['outputs']])
+    all_codes = all_codes.union(codes)
+  return list(all_codes)
+
 
 """
 Should report back unique filters in the following way:
@@ -123,6 +129,27 @@ Should report back unique filters in the following way:
   },
 ],
 """
+
+
+def get_possible_config_combinations_in_evaluations(evaluations: list) -> List[Dict[str, Any]]:
+  combinations = set() # type Set[str]
+
+  # encode config dicts as a sorted json string, for the purposes of using them in a set
+  for evaluation in evaluations:
+    config = evaluation['config'] # type: dict
+    config_string = json.dumps(config, sort_keys=True)
+    combinations.add(config_string)
+  
+  # decode them back to dicts
+  final_combinations_list = []
+  for combination in combinations:
+    final_combinations_list.append(json.loads(combination))
+
+  return final_combinations_list
+
+# wait wtf arent these two (func above and below) almost the same?
+# todo: make the lower one have a distinction
+
 def get_unique_config_params_in_evaluations(evaluations: list) -> List[Dict]:
   all_unique_config_params = dict() # type: Dict[Set]
   # The key - unique param name, value - list of unique values for the param
@@ -201,10 +228,21 @@ def create_evaluations_df(evaluations: list, all_possible_parameters: List[Dict]
     dropna=False)['value'].mean()
 
 
+def count_interpreted_answers_for_input_code(evaluations: List[Dict], input_code: str) -> Dict[str, int]:
+  interpreted_output_counts = dict()
+  for evaluation in evaluations:
+    #print('ASDFSDF'*50)
+    #print(evaluation)
+    interpreted_outputs = [output['interpreted_output'] for output in evaluation['outputs'] if output['input_code'] == input_code]
+    for interpreted_output in interpreted_outputs:
+      interpreted_output_counts[interpreted_output] = interpreted_output_counts.get(interpreted_output, 0) + 1
+  return interpreted_output_counts
+
+
 # test
 if __name__ == '__main__':
   c = DatabaseConnector()
-  models = c.get_unique_models_with_evaluations()
+  models = c.get_unique_model_ids_with_evaluations()
   model_id = 'hf::gpt2'
   evals = c.get_evaluations_for_model(model_id)
   unique_params = get_unique_config_params_in_evaluations(evals)

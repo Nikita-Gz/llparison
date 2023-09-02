@@ -2,8 +2,10 @@ from django.shortcuts import render
 from django.template import loader
 from django.http import HttpResponse, HttpRequest, Http404
 
-from .fake_run_data import get_processed_dict_for_output
-from .data_handling import DatabaseConnector, get_unique_config_params_in_evaluations, create_evaluations_df
+from .data_handling import (DatabaseConnector, get_unique_config_params_in_evaluations, create_evaluations_df, get_possible_config_combinations_in_evaluations, get_unique_input_codes_from_evaluations,
+                            count_interpreted_answers_for_input_code,
+                            RC_QUESTIONS, RC_TEXTS
+)
 
 import random
 from typing import *
@@ -11,6 +13,7 @@ import pandas as pd
 import copy
 import json
 import logging
+import string
 
 log = logging.getLogger("views.py")
 logging.basicConfig(level=logging.INFO)
@@ -23,12 +26,10 @@ def index(request: HttpRequest):
 
 
 def comparisons(request: HttpRequest):
-  models_list = conn.get_unique_models_with_evaluations()
+  models_list = conn.get_unique_model_ids_with_evaluations()
   assert len(models_list) != 0
   selected_model = models_list[0]
   
-  general_data, _ = get_processed_dict_for_output()
-
   context = {'general_data': {'models_list': models_list, 'selected_model': selected_model}}
   return render(request, "frontendapp/comparisons.html", context)
   #return HttpResponse("A?")
@@ -93,7 +94,7 @@ def convert_to_numeric_if_possible(value: Any) -> Union[float, Any]:
     return value
 
 
-def just_data(request: HttpRequest):
+def just_task_rating_data(request: HttpRequest):
   log.info('\n'*4)
   model_id = request.GET.get('single_model_id', None)
   model_evaluations = conn.get_evaluations_for_model(model_id)
@@ -129,4 +130,75 @@ def just_data(request: HttpRequest):
 
   return HttpResponse(json.dumps(data))
   #return HttpResponse("A?")
+
+
+def task_results_ui(request: HttpRequest):
+  models_list = conn.get_unique_model_ids_with_evaluations()
+  assert len(models_list) != 0
+
+  context = {
+    'models_ids': models_list,
+    'task_types': conn.get_unique_task_types()
+  }
+  return render(request, "frontendapp/task_results.html", context)
+
+
+idx2alphabet = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
+def _draw_rc_results(request) -> HttpResponse:
+  input_code = request.GET.get('input_code', None)
+  task_type = request.GET.get('task_type', None)
+  log.info(f'Drawing results for input code {input_code} and task type {task_type}')
+  llm_configs = json.loads(request.GET.get('llm_configs', None))
+
+  interpreted_output_counts_per_model = dict()
+  for llm_config_combination in llm_configs:
+    evals = conn.get_evaluations_for_llm_config_task_combination(task_type, llm_config_combination)
+    interpreted_output_counts_for_model = count_interpreted_answers_for_input_code(evals, input_code)
+    interpreted_output_counts_per_model[llm_config_combination['model_id']] = interpreted_output_counts_for_model
+
+  question_details = RC_QUESTIONS[input_code]
+  context = {
+    'question_context': RC_TEXTS[question_details['text_id']],
+    'input_code': input_code,
+    'question': question_details['question'],
+    'options': [f'{idx2alphabet.get(i)}) {option}' for i, option in enumerate(question_details['options'])],
+    'answer': question_details['answer'],
+    'interpreted_output_counts_per_model': interpreted_output_counts_per_model
+  }
+  print(context)
+  return render(request, "frontendapp/rc_results_ui.html", context)
+
+
+def _draw_results(request) -> HttpResponse:
+  task_type = request.GET.get('task_type', None)
+  function_selector_by_task = {
+    'Reading Comprehension': _draw_rc_results
+  }
+  return function_selector_by_task[task_type](request)
+
+
+def task_results_data(request: HttpRequest):
+  final_data = dict()
+
+  requested_data_type = request.GET.get('requested_data_type', None)
+  if requested_data_type == 'config_combinations':
+    model_id = request.GET.get('selected_model', None)
+    log.info(f'Returning config combinations for model {model_id}')
+    model_evaluations = conn.get_evaluations_for_model(model_id)
+    combinations = get_possible_config_combinations_in_evaluations(model_evaluations)
+    log.info(f'Got combinations: {combinations}')
+    final_data['config_combinations'] = combinations
+  elif requested_data_type == 'evaluations':
+    task_type = request.GET.get('task_type', None)
+    combinations = json.loads(request.GET.get('llm_configs', None))
+    log.info(f'Returning tests for task {task_type} and combos {combinations}')
+    evaluations = conn.get_evaluations_for_llm_config_task_combinations(task_type, combinations)
+    input_codes = get_unique_input_codes_from_evaluations(evaluations)
+    final_data['input_codes'] = input_codes
+  elif requested_data_type == 'evaluation_graphic':
+    return _draw_results(request)
+  else:
+    raise Exception(f'Unknown requested_data_type of {requested_data_type}')
+
+  return HttpResponse(json.dumps(final_data))
 

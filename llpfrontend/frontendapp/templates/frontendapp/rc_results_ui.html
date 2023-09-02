@@ -1,0 +1,27 @@
+
+<div>
+  <div id="task_details">
+    <labe>Context (input code = {{input_code}}): </label>
+    <p>{{ question_context }}</p>
+    <labe>Question:</label>
+    <p>{{ question }}</p>
+    <labe>Options:</label>
+    <ul>
+    {% for option in options %}
+      <li>{{option}}</li>
+    {% endfor %}
+    </ul>
+    <labe>Answer: {{answer}}</label>
+    <br/>
+  </div>
+  <div id="results_per_model">
+    {% for model_id, output_counts in interpreted_output_counts_per_model.items %}
+      <label>Iterpreted outputs for model {{model_id}}:</label>
+      <ul>
+      {% for output_letter, count in output_counts.items %}
+        <li>Answer {{output_letter}} - answered {{count}} times</li>
+      {% endfor %}
+      </ul>
+    {% endfor %}
+  </div>
+</div>
