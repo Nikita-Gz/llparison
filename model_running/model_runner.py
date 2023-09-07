@@ -12,6 +12,7 @@ import asyncio
 import aiohttp
 from typing import *
 import os
+import random
 
 models_cache = os.getcwd() + '/.hf/hfmodels/'
 idksomeothercache = os.getcwd() + '/.hf/hfother/'
@@ -60,7 +61,7 @@ class ModelRunner:
     pass
 
 
-  def run_hf_local(self, payloads: Dict[str, str], callback: EvaluationResultsCallback) -> Union[str, List[str]]:
+  def run_hf_local(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
     if self.model.owner != '':
       model_name = self.model.owner + '/' + self.model.name
     else:
@@ -117,6 +118,14 @@ class ModelRunner:
     log.warning(f'Could not run input code {input_code} on URL {API_URL}')
 
 
+  def _run_rc_test_function(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
+    rng = random.Random()
+    for input_code, payload in payloads.items():
+      rng.seed(payload)
+      output = rng.choice(['A', 'B', 'C', 'D'])
+      callback.record_output(output, input_code=input_code)
+
+
   # payloads - dict of {input_key: prompt}
   def run_model(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
     # give a warning if the prompt is > context size
@@ -127,7 +136,9 @@ class ModelRunner:
     #if payload_size > self.model.context_size:
     #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
     
-    if self.model.source == 'OpenRouter':
+    if self.model.name == 'rc_test_model':
+      self._run_rc_test_function(payloads, callback)
+    elif self.model.source == 'OpenRouter':
       self.run_openrouter_payload(payloads, callback)
     elif self.model.source == 'hf' and self.model.hf_inferable:
       asyncio.run(self.run_hf_inference_payload(payloads, callback))
@@ -153,7 +164,7 @@ class ModelRunner:
   '''
 
 
-  async def run_hf_inference_payload(self, payloads: Dict[str, str], callback: EvaluationResultsCallback) -> Union[str, List[str]]:
+  async def run_hf_inference_payload(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
     parameters_to_get_and_defaults = {
       'temperature': 0.0000001,
       'top_p': 0.92,

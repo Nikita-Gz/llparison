@@ -103,22 +103,37 @@ class Task:
 
 
   def _get_llm_config_combinations(self, models_for_evaluating: List[RunnableModel]) -> List[Tuple[RunnableModel, Config]]:
-    def get_configs_for_llm(model: RunnableModel) -> List[Config]:
-      config1 = Config()
-      config1.set_parameter('temperature', 0.5)
-      config1.set_parameter('top-p', 0.5)
-      config2 = Config()
-      config2.set_parameter('temperature', 0.001)
-      config2.set_parameter('top-p', 0.5)
-      return [config1, config2]
+    def get_combinations_for_rc():
+      def get_configs_for_llm(model: RunnableModel) -> List[Config]:
+        config1 = Config()
+        config1.set_parameter('temperature', 0.5)
+        config1.set_parameter('top-p', 0.5)
+        config2 = Config()
+        config2.set_parameter('temperature', 0.001)
+        config2.set_parameter('top-p', 0.5)
+        return [config1, config2]
+      
+      combinations = [] # type: List[Tuple[RunnableModel, Config]]
+      for model in models_for_evaluating:
+        combinations_for_model = []
+        for config in get_configs_for_llm(model):
+          combinations.append((model, config))
+        log.info(f'Got {len(combinations_for_model)} combinations for model {model._id}')
+      return combinations
     
-    combinations = [] # type: List[Tuple[RunnableModel, Config]]
-    for model in models_for_evaluating:
-      combinations_for_model = []
-      for config in get_configs_for_llm(model):
-        combinations.append((model, config))
-      log.info(f'Got {len(combinations_for_model)} combinations for model {model._id}')
-    return combinations
+    '''
+    def get_combinations_for_rc_test():
+      combinations = [] # type: List[Tuple[RunnableModel, Config]]
+      for model in models_for_evaluating:
+        combinations.append((model, Config()))
+      log.info(f'Got {len(combinations)} combinations for RC testing model')
+      return combinations
+    '''
+
+    if self.type == TaskType.READING_COMPREHENSION:
+      return get_combinations_for_rc()
+    else:
+      raise NotImplemented(f'Unknown task type {self.type}')
 
 
   def _convert_date_to_datetime(self, date: Union[str, datetime.datetime]) -> datetime.datetime:
@@ -156,6 +171,12 @@ class Task:
   def _create_new_experiment(self, db_connection: DatabaseConnector, date: datetime.datetime):
     log.info(f'Creating a new experiment record for task {self.type} at {date}')
     models_for_evaluating = db_connection.get_models_available_for_evaluating()
+
+    # todo: change this crutch into something more adequate
+    # keeps only "rc_test_model" models if the task type is according
+    if self.type == TaskType.READING_COMPREHENSION_TEST:
+      models_for_evaluating = [model for model in models_for_evaluating if model.name == 'rc_test_model']
+
     llm_config_combinations = self._get_llm_config_combinations(models_for_evaluating)
     
     assert len(llm_config_combinations) == 0, f'No possible LLM-config combinations'
