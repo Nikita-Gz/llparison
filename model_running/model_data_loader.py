@@ -7,11 +7,15 @@ from typing import *
 import mongomock
 import json
 import datetime
+import logging
 from pymongo import UpdateMany, UpdateOne
 
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
 from run_config import Config
+
+log = logging.getLogger("model_data_loader.py")
+logging.basicConfig(level=logging.INFO)
 
 class DatabaseConnector:
   columns_list = ['first_tracked_on', 'last_tracked_on', 'available', 'original_name', 'owner', 'name', 'price_prompt', 'ff_inference_api_supported', 'source', 'price_completion', 'context', 'prompt_limit', 'max_tokens_limit']
@@ -25,6 +29,7 @@ class DatabaseConnector:
 
     running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
     real_data_mode = running_on_k8s and not testing_mode
+    log.info(f'real_data_mode {real_data_mode}')
     if real_data_mode:
       self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
     else:

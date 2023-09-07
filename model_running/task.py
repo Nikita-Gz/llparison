@@ -55,7 +55,7 @@ class Task:
 
   def _load_raw_reading_comprehension_data(self) -> Tuple[Dict, Dict]:
     log.info('Loading RC dataset')
-    with open("./model_tasks/rc/rc_dataset.txt", 'r') as file:
+    with open("./rc_dataset.txt", 'r') as file:
       dataset = json.load(file)
     rc_texts = dataset['texts']
     rc_questions = dataset['questions']

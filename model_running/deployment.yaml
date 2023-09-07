@@ -20,6 +20,7 @@ spec:
       - name: model-evaluation-container
         image: data6s/model_running:latest
         command: ['python', '/app/test_driver.py']
+        #command: ['bash']
         resources:
           limits:
             memory: "4096Mi"

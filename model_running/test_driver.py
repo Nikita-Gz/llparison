@@ -1,4 +1,5 @@
 import logging
+import time
 
 from model_data_loader import DatabaseConnector
 from task import Task
@@ -10,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 def get_testing_db():
   db = DatabaseConnector(
-    testing_mode=True,
+    testing_mode=False,
     insert_testing_models=False,
     data_to_insert_by_default=
     {
@@ -60,11 +61,16 @@ def test_driver():
   # 3) run the task
   # 4) view the results
 
-  db = get_testing_db()
-  task = Task(TaskType.READING_COMPREHENSION)
-  task.run_reworked_reading_comprehension(db, '2020:idkk', None, db_cache_limit=50000)
-  a = db.get_experiment_from_id('Reading Comprehensionme:me:rc_test_model{"temperature": 0.5, "top-p": 0.5}2020:idkk')
-  print_database(db)
+  while True:
+    log.info('Doing stuff')
+    db = get_testing_db()
+    task = Task(TaskType.READING_COMPREHENSION)
+    task.run_reworked_reading_comprehension(db, '2020:idkk', None, db_cache_limit=50000)
+    a = db.get_experiment_from_id('Reading Comprehensionme:me:rc_test_model{"temperature": 0.5, "top-p": 0.5}2020:idkk')
+    log.info(a['metrics'])
+    log.info('done, sleeping')
+    time.sleep(60*60*6)
+  #print_database(db)
 
 
 if __name__ == "__main__":
