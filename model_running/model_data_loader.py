@@ -7,6 +7,7 @@ from typing import *
 import mongomock
 import json
 import datetime
+from pymongo import UpdateMany, UpdateOne
 
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
@@ -175,7 +176,7 @@ class DatabaseConnector:
   
 
   def create_experiment_stump(self, model: RunnableModel, task_type: str, config: Config, experiment_date: str) -> str:
-    experiment_id = self._make_run_id(model, task_type, config, experiment_date),
+    experiment_id = self._make_run_id(model, task_type, config, experiment_date)
     experiment_dict = {
       '_id': experiment_id,
       'date': experiment_date,
@@ -201,11 +202,19 @@ class DatabaseConnector:
 
 
   def get_experiment_from_id(self, experiment_id: str) -> Dict:
-    return self.experiments.find({'_id': experiment_id})
+    return list(self.experiments.find({'_id': experiment_id}))[0]
 
 
   def mark_experiment_as_finished(self, _id, too_expensive):
-    self.experiments.update_one({'_id': _id}, {'finished': True, 'too_expensive': too_expensive})
+    self.experiments.update_one(
+      {'_id': _id},
+      {
+        '$set':
+        {
+          'finished': True,
+          'too_expensive': too_expensive
+        }
+      })
 
 
   def get_model_from_id(self, _id) -> Union[RunnableModel, None]:
@@ -227,6 +236,13 @@ class DatabaseConnector:
     self.experiments.update_one(
       {'_id': experiment_id},
       {'$push': {'outputs': output}})
+    
+
+  def append_many_outputs_to_experiments(self, experiment_id, outputs: List[dict]):
+    self.experiments.update_one(
+      {'_id': experiment_id},
+      {'$push': {'outputs': { '$each': outputs }}}
+    )
 
 
   def set_metrics_to_experiment(self, experiment_id, metrics):

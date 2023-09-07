@@ -215,7 +215,8 @@ class Task:
       self,
       db_connection: DatabaseConnector,
       date: datetime.datetime,
-      cost_limit=None):
+      cost_limit=None,
+      db_cache_limit=500):
     '''
     1) Check for unfinished experiments in DB (pick a random one if there are)
     2) Get the list of known models
@@ -261,9 +262,11 @@ class Task:
       task=self.type,
       existing_processed_outputs=already_completed_outputs,
       validation_data=rc_questions,
-      db_enabled=True)
+      db_enabled=True,
+      db_cache_limit=db_cache_limit)
     try:
       runner.run_model(prompts_dict, callback=evaluation_callback)
+      evaluation_callback.finalize_evaluation()
     except Exception as e:
       log.error(e)
       raise e
@@ -353,10 +356,15 @@ class Task:
     return TaskOutput(metrics, model_outputs, interpreted_outputs, input_codes)
 
   # returns a list of metrics, outputs
-  def run_task(self, db_connection: DatabaseConnector, date: datetime.datetime, cost_limit=None) -> TaskOutput:
+  def run_task(
+      self,
+      db_connection: DatabaseConnector,
+      date: datetime.datetime,
+      cost_limit=None,
+      db_cache_limit=500) -> TaskOutput:
     if self.type == TaskType.READING_COMPREHENSION:
       log.info(f'Running reading comprehension on date {date} with cost limit {cost_limit}')
-      return self.run_reworked_reading_comprehension(db_connection, date, cost_limit)
+      return self.run_reworked_reading_comprehension(db_connection, date, cost_limit, db_cache_limit=db_cache_limit)
     else:
       raise NotImplementedError(f'Tried running an unsupported task type, {self.type}')
 

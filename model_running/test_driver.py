@@ -62,9 +62,9 @@ def test_driver():
 
   db = get_testing_db()
   task = Task(TaskType.READING_COMPREHENSION)
-  task.run_reworked_reading_comprehension(db, '2020:idkk', None)
+  task.run_reworked_reading_comprehension(db, '2020:idkk', None, db_cache_limit=50000)
+  a = db.get_experiment_from_id('Reading Comprehensionme:me:rc_test_model{"temperature": 0.5, "top-p": 0.5}2020:idkk')
   print_database(db)
-
 
 
 if __name__ == "__main__":

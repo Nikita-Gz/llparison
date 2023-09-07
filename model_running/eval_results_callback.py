@@ -1,10 +1,13 @@
 import string
 import re
+import logging
 from typing import *
 
 from model_data_loader import DatabaseConnector
 from task_type import TaskType
 
+log = logging.getLogger("eval_results_callback.py")
+logging.basicConfig(level=logging.INFO)
 
 # computes scores and saves perliminary results into a db
 class EvaluationResultsCallback:
@@ -12,12 +15,13 @@ class EvaluationResultsCallback:
   idx2alphabet = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
 
   def __init__(self,
-               db_connection: DatabaseConnector,
+               db_connection: Union[DatabaseConnector, None],
                experiment_id: str,
                task: TaskType,
                existing_processed_outputs=None,
                validation_data=None,
                db_enabled=True,
+               db_cache_limit=500,
                **kwargs) -> None:
     self.db_connection = db_connection
     self.experiment_id = experiment_id
@@ -30,17 +34,52 @@ class EvaluationResultsCallback:
       self.processed_outputs = dict()
     else:
       self.processed_outputs = existing_processed_outputs
+    
+    self._cached_output_writes = []
+    self._db_cache_limit = db_cache_limit
   
 
   def _compute_reading_comprehension_metrics(self):
-    accuracy = sum([output['correct'] for output in self.processed_outputs]) / len(self.processed_outputs)
+    processed_output_values = self.processed_outputs.values()
+    accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
     return {
       'accuracy': accuracy
     }
+  
+
+  def _flush_the_cache(self):
+    log.info(f'Writing {len(self._cached_output_writes)} outputs to DB')
+    self.db_connection.append_many_outputs_to_experiments(self.experiment_id, self._cached_output_writes)
+    self._cached_output_writes = []
+
+
+  def _cache_or_write_output_to_db(self, processed_output: Union[dict, None]):
+    if self.db_connection is None:
+      log.warning('Ignoring DB cache/write call as there is no DB')
+      return
+    
+    # just write the cache if there is no processed output
+    if processed_output is None:
+      self._flush_the_cache()
+    else:
+      self._cached_output_writes.append(processed_output)
+      if len(self._cached_output_writes) >= self._db_cache_limit:
+        self._flush_the_cache()
+
+
+  def finalize_evaluation(self):
+    '''
+    Call this when the evaluation is finished. This flushes the chached DB writes
+    '''
+    if self.db_connection is not None:
+      self._cache_or_write_output_to_db(processed_output=None)
 
 
   def compute_and_save_metrics(self):
-    # go through all processed outputs
+    if len(self._cached_output_writes) > 0:
+      log.warning(f'There are {len(self._cached_output_writes)} unsaved writes when compute_and_save_metrics was called')
+
+    # go through all processed outputs. Flushes DB cache beforehand
     if self.task == TaskType.READING_COMPREHENSION:
       metrics = self._compute_reading_comprehension_metrics()
     else:
@@ -83,5 +122,5 @@ class EvaluationResultsCallback:
       raise NotImplementedError(f'Task {self.task} is NYI')
     
     if self.db_connection is not None:
-      self.db_connection.append_output_to_experiment(self.experiment_id, processed_output)
+      self._cache_or_write_output_to_db(processed_output)
 
