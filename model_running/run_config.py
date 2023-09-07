@@ -1,7 +1,7 @@
 class Config:
   def __init__(self, parameters_dict=None) -> None:
     if parameters_dict is None:
-      self._parameters = dict
+      self._parameters = dict()
     else:
       self._parameters = parameters_dict
 

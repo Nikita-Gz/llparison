@@ -5,3 +5,4 @@
 !.gitignore
 s/
 __pycache__/
+secrets.yaml

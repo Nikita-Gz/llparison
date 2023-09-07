@@ -28,8 +28,9 @@ log = logging.getLogger("task.py")
 logging.basicConfig(level=logging.INFO)
 
 
-with open("./s/hf_read", 'r') as file:
-  HF_API_TOKEN = file.read()
+HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
+if HF_API_TOKEN is None:
+  log.warning("No HF token env variable")
 hf_headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
 
 
@@ -119,10 +120,14 @@ class ModelRunner:
 
 
   def _run_rc_test_function(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
-    rng = random.Random()
-    for input_code, payload in payloads.items():
-      rng.seed(payload)
-      output = rng.choice(['A', 'B', 'C', 'D'])
+    #rng = random.Random()
+    #rng.seed(11037)
+    #payloads_size = len(payloads)
+    output_choices = ['A', 'B', 'C', 'D']
+    for i, input_code in enumerate(payloads.keys()):
+      if i % 1000 == 0:
+        print(f'{i} out of {len(payloads)}')
+      output = output_choices[random.randint(0, 3)]
       callback.record_output(output, input_code=input_code)
 
 
@@ -131,7 +136,7 @@ class ModelRunner:
     # give a warning if the prompt is > context size
     log.info(f'Running model {self.model._id}')
 
-    payload_size = self.count_tokens(list(payloads.value()))
+    payload_size = self.count_tokens(list(payloads.values()))
     log.info(f'{payload_size} tokens')
     #if payload_size > self.model.context_size:
     #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')

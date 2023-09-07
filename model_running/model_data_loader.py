@@ -15,11 +15,16 @@ from run_config import Config
 class DatabaseConnector:
   columns_list = ['first_tracked_on', 'last_tracked_on', 'available', 'original_name', 'owner', 'name', 'price_prompt', 'ff_inference_api_supported', 'source', 'price_completion', 'context', 'prompt_limit', 'max_tokens_limit']
 
-  def __init__(self) -> None:
+  def __init__(
+      self,
+      testing_mode: bool,
+      insert_testing_models: bool,
+      data_to_insert_by_default=None) -> None:
     # use a mock DB if the app is not on k8s
 
     running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
-    if running_on_k8s:
+    real_data_mode = running_on_k8s and not testing_mode
+    if real_data_mode:
       self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
     else:
       self.mongo_client = mongomock.MongoClient()
@@ -28,8 +33,16 @@ class DatabaseConnector:
     self.models = self.db['models']
     self.experiments = self.db['experiments']
 
-    if not running_on_k8s:
+    if insert_testing_models:
       self._fill_with_testing_stuff()
+    
+    if data_to_insert_by_default is not None:
+      self._insert_data_in_collections(data_to_insert_by_default)
+
+  
+  def _insert_data_in_collections(self, data: Dict[str, List[Dict]]):
+    for collection, items in data.items():
+      self.db[collection].insert_many(items)
 
 
   def _get_testing_models(self):
@@ -151,7 +164,13 @@ class DatabaseConnector:
   
 
   def _make_run_id(self, model: RunnableModel, task_type: str, config: Config, experiment_date: str):
-    experiment_id = str(task_type) + str(model._id) + json.dumps(config.to_dict()) + experiment_date
+    parts = [
+      str(task_type),
+      str(model._id),
+      json.dumps(config.to_dict()),
+      experiment_date
+    ]
+    experiment_id = ''.join(parts)
     return experiment_id
   
 
@@ -181,7 +200,7 @@ class DatabaseConnector:
       'finished': False}))
 
 
-  def get_experiments_from_id(self, experiment_id: str) -> Dict:
+  def get_experiment_from_id(self, experiment_id: str) -> Dict:
     return self.experiments.find({'_id': experiment_id})
 
 

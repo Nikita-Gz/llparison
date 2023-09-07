@@ -108,17 +108,15 @@ class Task:
         config1 = Config()
         config1.set_parameter('temperature', 0.5)
         config1.set_parameter('top-p', 0.5)
-        config2 = Config()
-        config2.set_parameter('temperature', 0.001)
-        config2.set_parameter('top-p', 0.5)
-        return [config1, config2]
+        return [config1]
       
       combinations = [] # type: List[Tuple[RunnableModel, Config]]
       for model in models_for_evaluating:
         combinations_for_model = []
         for config in get_configs_for_llm(model):
-          combinations.append((model, config))
+          combinations_for_model.append((model, config))
         log.info(f'Got {len(combinations_for_model)} combinations for model {model._id}')
+        combinations.extend(combinations_for_model)
       return combinations
     
     '''
@@ -156,8 +154,9 @@ class Task:
     PROPRIETARY_SOURCES_LIST = ['OpenRouter']
     combinations_to_evaluate = []
     for considered_combination in possible_combinations:
-      model_source = considered_combination[0].source
-      latest_experiment = db_connector.get_latest_evaluation_for_combination(considered_combination)
+      model, configuration = considered_combination
+      model_source = model.source
+      latest_experiment = db_connector.get_latest_evaluation_for_combination(model, task_type_int_to_str[self.type], configuration)
       if latest_experiment is None:
         combinations_to_evaluate.append(considered_combination)
       elif model_source not in PROPRIETARY_SOURCES_LIST:
@@ -171,15 +170,12 @@ class Task:
   def _create_new_experiment(self, db_connection: DatabaseConnector, date: datetime.datetime):
     log.info(f'Creating a new experiment record for task {self.type} at {date}')
     models_for_evaluating = db_connection.get_models_available_for_evaluating()
-
-    # todo: change this crutch into something more adequate
-    # keeps only "rc_test_model" models if the task type is according
-    if self.type == TaskType.READING_COMPREHENSION_TEST:
-      models_for_evaluating = [model for model in models_for_evaluating if model.name == 'rc_test_model']
+    log.info(f'Got {len(models_for_evaluating)} models up for evaluations')
 
     llm_config_combinations = self._get_llm_config_combinations(models_for_evaluating)
+    log.info(f'Got {len(llm_config_combinations)} total combinations')
     
-    assert len(llm_config_combinations) == 0, f'No possible LLM-config combinations'
+    assert len(llm_config_combinations) != 0, f'No possible LLM-config combinations'
     combinations_up_for_evaluation = self._pick_out_combinations_needing_evaluations(
       llm_config_combinations,
       db_connection,
@@ -275,7 +271,7 @@ class Task:
     # checks if all evaluations were completed, save metrics if so, complain and die if not
     all_input_codes = set(rc_questions.keys())
     processed_input_codes = set([
-      output['input_code'] for output in db_connection.get_experiments_from_id(experiment_id)['outputs']])
+      output['input_code'] for output in db_connection.get_experiment_from_id(experiment_id)['outputs']])
     if all_input_codes == processed_input_codes:
       evaluation_callback.compute_and_save_metrics()
       db_connection.mark_experiment_as_finished(experiment_id, too_expensive=False)
@@ -357,10 +353,10 @@ class Task:
     return TaskOutput(metrics, model_outputs, interpreted_outputs, input_codes)
 
   # returns a list of metrics, outputs
-  def run_task(self, model: RunnableModel, config, cost_check_callback=None) -> TaskOutput:
+  def run_task(self, db_connection: DatabaseConnector, date: datetime.datetime, cost_limit=None) -> TaskOutput:
     if self.type == TaskType.READING_COMPREHENSION:
-      log.info(f'Running reading comprehension on model {model._id}')
-      return self.run_reading_comprehension(model, config, cost_check_callback)
+      log.info(f'Running reading comprehension on date {date} with cost limit {cost_limit}')
+      return self.run_reworked_reading_comprehension(db_connection, date, cost_limit)
     else:
       raise NotImplementedError(f'Tried running an unsupported task type, {self.type}')
 

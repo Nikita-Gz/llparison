@@ -26,7 +26,7 @@ class EvaluationResultsCallback:
     self.test_data = validation_data # type: Union[None, Dict]
     self.arguments = kwargs # kwargs are task-specific data
 
-    if existing_processed_outputs is None:
+    if existing_processed_outputs is None or len(existing_processed_outputs) == 0:
       self.processed_outputs = dict()
     else:
       self.processed_outputs = existing_processed_outputs

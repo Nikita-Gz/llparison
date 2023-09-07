@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-evaluation-deployment
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+  selector:
+    matchLabels:
+      app: model-evaluation-app
+  template:
+    metadata:
+      labels:
+        app: model-evaluation-app
+    spec:
+      containers:
+      - name: model-evaluation-container
+        image: data6s/model_running:latest
+        command: ['python', '/app/test_driver.py']
+        resources:
+          limits:
+            memory: "4096Mi"
+            cpu: "2000m"
+          requests:
+            memory: "128Mi"
+            cpu: "500m"
+        env:
+        - name: K8S_DEPLOYMENT
+          value: "1"
+        - name: HF_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: api-tokens
+              key: huggingface
+      terminationGracePeriodSeconds: 2
