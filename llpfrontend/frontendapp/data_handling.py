@@ -34,6 +34,7 @@ class DatabaseConnector:
     # use a mock DB if the app is not on k8s
 
     running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
+    log.info(f'running_on_k8s: {running_on_k8s}')
     if running_on_k8s:
       self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
     else:
