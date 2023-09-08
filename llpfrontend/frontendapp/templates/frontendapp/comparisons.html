@@ -157,6 +157,10 @@ function process_single_model_data_response(response) {
 
 function model_list_click_handler(model_name) {
     selected_model_id = model_name
+    if (selected_model_id === 'None') {
+        return
+    }
+
     update_selected_model_highlighter()
 
     $.ajax({
@@ -192,6 +196,9 @@ $(document).ready(update_selected_model_highlighter)
 <!-- you can also play around with the width and height to increase or decrease the chart size -->
 
 <div id='model_list'>
+{% if no_models%}
+<label>No models available for comparison!</label>
+{% endif %}
 <ul>
     {% for model_name in general_data.models_list %}
         <li id="{{model_name}}_list_item">{{model_name}}</li>
@@ -205,7 +212,9 @@ $(document).ready(update_selected_model_highlighter)
 <div>
 <div id='filters_div'>
 </div>
+{% if not no_models%}
 <button type="button" onclick="apply_filters()">Apply filters</button>
+{% endif %}
 </div>
 
 <div id='error_message'>

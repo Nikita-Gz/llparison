@@ -30,10 +30,13 @@ def comparisons(request: HttpRequest):
 
   if len(models_list) == 0:
     selected_model = None
+    no_models = True
   else:
     selected_model = models_list[0]
+    no_models = False
   
-  context = {'general_data': {'models_list': models_list, 'selected_model': selected_model}}
+  context = {'general_data': {'models_list': models_list, 'selected_model': selected_model},
+             'no_models': no_models}
   return render(request, "frontendapp/comparisons.html", context)
   #return HttpResponse("A?")
 
