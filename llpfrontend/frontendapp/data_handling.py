@@ -20,7 +20,7 @@ def _load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
   global RC_TEXTS
   global RC_QUESTIONS
   log.info('Loading RC dataset')
-  with open("../model_tasks/rc/rc_dataset.txt", 'r') as file:
+  with open("./rc_dataset.txt", 'r') as file:
     dataset = json.load(file)
   RC_TEXTS = dataset['texts']
   RC_QUESTIONS = dataset['questions']
@@ -65,6 +65,8 @@ class DatabaseConnector:
   def get_evaluations_for_llm_config_task_combination(self, task_type: str, combination: Dict):
     experiments_matching_model = list(self.experiments.find({
       'task_type': task_type,
+      'finished': True,
+      'too_expensive': False,
       'model_id': combination['model_id']}))
     config_to_look_for = combination['config']
     experiments_matching_models_and_configs = [
@@ -77,6 +79,8 @@ class DatabaseConnector:
   def get_evaluations_for_llm_config_task_combinations(self, task_type: str, combinations: List[Dict]):
     experiments_matching_models = list(self.experiments.find({
       'task_type': task_type,
+      'finished': True,
+      'too_expensive': False,
       'model_id': {'$in': [combination['model_id'] for combination in combinations]}
     }))
 
@@ -88,15 +92,25 @@ class DatabaseConnector:
     return experiments_matching_models_and_configs
 
 
-  def get_unique_model_ids_with_evaluations(self) -> list:
+  def get_unique_model_ids_with_finished_evaluations(self) -> list:
     # unique model - unique by id, present in experiments
     #return pd.DataFrame(columns=self.columns_list)
-    unique_models = self.experiments.distinct("model_id")
+    unique_models = list(set(
+      [
+        experiment['model_id']
+        for experiment in list(self.experiments.find({
+        'finished': True,
+        'too_expensive': False}))
+      ]))
     return list(unique_models)
   
 
-  def get_evaluations_for_model(self, model_id) -> list:
-    evaluations = self.experiments.find({'model_id': model_id})
+  def get_finished_evaluations_for_model(self, model_id) -> list:
+    evaluations = self.experiments.find({
+      'model_id': model_id,
+      'finished': True,
+      'too_expensive': False
+      })
     return list(evaluations)
 
 
@@ -242,9 +256,9 @@ def count_interpreted_answers_for_input_code(evaluations: List[Dict], input_code
 # test
 if __name__ == '__main__':
   c = DatabaseConnector()
-  models = c.get_unique_model_ids_with_evaluations()
+  models = c.get_unique_model_ids_with_finished_evaluations()
   model_id = 'hf::gpt2'
-  evals = c.get_evaluations_for_model(model_id)
+  evals = c.get_finished_evaluations_for_model(model_id)
   unique_params = get_unique_config_params_in_evaluations(evals)
   a = create_evaluations_df(evals, unique_params, {'temperature': 1, 'testparam': 'none'}, 'all')
   print(a)

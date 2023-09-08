@@ -26,9 +26,12 @@ def index(request: HttpRequest):
 
 
 def comparisons(request: HttpRequest):
-  models_list = conn.get_unique_model_ids_with_evaluations()
-  assert len(models_list) != 0
-  selected_model = models_list[0]
+  models_list = conn.get_unique_model_ids_with_finished_evaluations()
+
+  if len(models_list) == 0:
+    selected_model = None
+  else:
+    selected_model = models_list[0]
   
   context = {'general_data': {'models_list': models_list, 'selected_model': selected_model}}
   return render(request, "frontendapp/comparisons.html", context)
@@ -97,7 +100,7 @@ def convert_to_numeric_if_possible(value: Any) -> Union[float, Any]:
 def just_task_rating_data(request: HttpRequest):
   log.info('\n'*4)
   model_id = request.GET.get('single_model_id', None)
-  model_evaluations = conn.get_evaluations_for_model(model_id)
+  model_evaluations = conn.get_finished_evaluations_for_model(model_id)
   if len(model_evaluations) == 0:
     return Http404()
   
@@ -133,7 +136,7 @@ def just_task_rating_data(request: HttpRequest):
 
 
 def task_results_ui(request: HttpRequest):
-  models_list = conn.get_unique_model_ids_with_evaluations()
+  models_list = conn.get_unique_model_ids_with_finished_evaluations()
   assert len(models_list) != 0
 
   context = {
@@ -184,7 +187,7 @@ def task_results_data(request: HttpRequest):
   if requested_data_type == 'config_combinations':
     model_id = request.GET.get('selected_model', None)
     log.info(f'Returning config combinations for model {model_id}')
-    model_evaluations = conn.get_evaluations_for_model(model_id)
+    model_evaluations = conn.get_finished_evaluations_for_model(model_id)
     combinations = get_possible_config_combinations_in_evaluations(model_evaluations)
     log.info(f'Got combinations: {combinations}')
     final_data['config_combinations'] = combinations
