@@ -1,4 +1,5 @@
 import logging
+import datetime
 import time
 
 from model_data_loader import DatabaseConnector
@@ -65,7 +66,7 @@ def test_driver():
     log.info('Doing stuff')
     db = get_testing_db()
     task = Task(TaskType.READING_COMPREHENSION)
-    task.run_reworked_reading_comprehension(db, '2020:idkk', None, db_cache_limit=50000)
+    task.run_reworked_reading_comprehension(db, str(datetime.datetime.now()), None, db_cache_limit=50000)
     a = db.get_experiment_from_id('Reading Comprehensionme:me:rc_test_model{"temperature": 0.5, "top-p": 0.5}2020:idkk')
     log.info(a['metrics'])
     log.info('done, sleeping')
