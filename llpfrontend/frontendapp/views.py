@@ -27,7 +27,6 @@ def index(request: HttpRequest):
 
 def comparisons(request: HttpRequest):
   models_list = conn.get_unique_model_ids_with_finished_evaluations()
-<<<<<<< HEAD
 
   if len(models_list) == 0:
     selected_model = None
@@ -35,10 +34,6 @@ def comparisons(request: HttpRequest):
   else:
     selected_model = models_list[0]
     no_models = False
-=======
-  assert len(models_list) != 0
-  selected_model = models_list[0]
->>>>>>> c4c96fb7a4dfd15a94dfe5c6c15b9eaa5333332c
   
   context = {'general_data': {'models_list': models_list, 'selected_model': selected_model},
              'no_models': no_models}
