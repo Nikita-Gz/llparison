@@ -9,6 +9,7 @@ import json
 import datetime
 import logging
 from pymongo import UpdateMany, UpdateOne
+import pymongo
 
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
@@ -29,7 +30,7 @@ class DatabaseConnector:
 
     running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
     real_data_mode = running_on_k8s and not testing_mode
-    log.info(f'real_data_mode {real_data_mode}')
+    log.info(f'real_data_mode: {real_data_mode}')
     if real_data_mode:
       self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
     else:
@@ -43,12 +44,15 @@ class DatabaseConnector:
       self._fill_with_testing_stuff()
     
     if data_to_insert_by_default is not None:
-      self._insert_data_in_collections(data_to_insert_by_default)
+      self._insert_default_data_in_collections(data_to_insert_by_default)
 
   
-  def _insert_data_in_collections(self, data: Dict[str, List[Dict]]):
+  def _insert_default_data_in_collections(self, data: Dict[str, List[Dict]]):
     for collection, items in data.items():
-      self.db[collection].insert_many(items)
+      try:
+        self.db[collection].insert_many(items)
+      except Exception as e:
+        log.warn(f'Got a default data write error: \n' + str(e))
 
 
   def _get_testing_models(self):
@@ -114,7 +118,10 @@ class DatabaseConnector:
 
 
   def _fill_with_testing_stuff(self):
-    self.models.insert_many(self._get_testing_models())
+    try:
+      self.models.insert_many(self._get_testing_models())
+    except pymongo.errors.BulkWriteError as e:
+      log.warn(f'Got a testing data write error: \n' + e.details['writeErrors'])
 
   # todo: verify columns?
 
