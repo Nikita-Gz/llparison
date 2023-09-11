@@ -36,11 +36,11 @@ def get_openrouter_models(tracking_date: str) -> Dict[str, Dict]:
           'date': tracking_date,
           'hf_inference_api_supported': False,
           'available': None,
-          'context_size': model['context_length'],
-          'price_prompt': model['pricing']['prompt'],
-          'price_completion': model['pricing']['completion'],
-          'prompt_limit': model['input_limits']['prompt_tokens'],
-          'max_tokens_limit': model['input_limits']['max_tokens']
+          'context_size': int(model['context_length']),
+          'price_prompt': float(model['pricing']['prompt']),
+          'price_completion': float(model['pricing']['completion']),
+          'prompt_limit': int(model['input_limits']['prompt_tokens']),
+          'max_tokens_limit': int(model['input_limits']['max_tokens'])
         }
       ]
     }
