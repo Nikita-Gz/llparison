@@ -231,9 +231,14 @@ class DatabaseConnector:
 
 
   def get_model_from_id(self, _id) -> Union[RunnableModel, None]:
-    model_obj = self.models.find({'_id': _id})
-    if model_obj is None:
+    # todo: make it use propper cursors
+    model_cursor = list(self.models.find({'_id': _id}))
+    if len(model_cursor) == 0:
+      log.error(f'Could not find model ID {_id}')
       return None
+    else:
+      model_obj = model_cursor[0]
+
     return RunnableModel(
         _id=model_obj['_id'],
         owner=model_obj['owner'],
