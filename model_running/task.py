@@ -17,6 +17,7 @@ from runnable_model_data import RunnableModel
 from run_config import Config
 from task_output import TaskOutput
 from task_type import TaskType, task_type_int_to_str
+from cost_callback import CostCallback
 from eval_results_callback import EvaluationResultsCallback
 
 # todo: !! custom tasks must be saved to db and loaded from it
@@ -203,9 +204,13 @@ class Task:
   
 
   def _compute_prompts_cost(self, prompts: List[str], model_runner: ModelRunner) -> float:
-    token_count = model_runner.count_tokens(prompts)
-    log.info(f'Total token count is {token_count}')
-    total_cost = model_runner.model.price * token_count
+    if model_runner.model.price == 0:
+      total_cost = 0
+    else:
+      token_count = model_runner.count_tokens(prompts)
+      log.info(f'Total token count is {token_count}')
+      total_cost = model_runner.model.price * token_count
+
     log.info(f'Total token cost is {total_cost}')
     return total_cost
 
@@ -216,7 +221,8 @@ class Task:
       db_connection: DatabaseConnector,
       date: datetime.datetime,
       cost_limit=None,
-      db_cache_limit=500):
+      db_cache_limit=500,
+      cost_callback: Union[CostCallback, None] = None):
     '''
     1) Check for unfinished experiments in DB (pick a random one if there are)
     2) Get the list of known models
@@ -249,11 +255,19 @@ class Task:
       excluded_question_ids=set([output['input_code'] for output in already_completed_outputs]))
     runner = ModelRunner(model, config)
 
+    # process the cost
     if cost_limit is not None:
-      if self._compute_prompts_cost(list(prompts_dict.values()), runner) > cost_limit:
-        log.error(f'Cost is too high, aborting experiment {experiment_id}')
+      total_cost = self._compute_prompts_cost(list(prompts_dict.values()), runner)
+      if total_cost > cost_limit:
+        log.error(f'Cost is too high, aborting experiment {experiment_id} and marking it as finished')
         db_connection.mark_experiment_as_finished(experiment_id, too_expensive=True)
         return
+      elif cost_callback is not None:
+        cost_callback.register_estimated_initial_cost(total_cost)
+        log.info('Registering the cost with the callback')
+      log.info('The cost is acceptable')
+    else:
+      log.info('Cost limit is none')
 
     #_get_reading_comprehension_answer_id_from_model_output
     evaluation_callback = EvaluationResultsCallback(
@@ -279,8 +293,7 @@ class Task:
       evaluation_callback.compute_and_save_metrics()
       db_connection.mark_experiment_as_finished(experiment_id, too_expensive=False)
     else:
-      log.error(f'Not all input codes were processed: {all_input_codes.difference(processed_input_codes)}')
-
+      log.error(f'Not all input codes were processed, the experiment was not marked as finished: {len(all_input_codes.difference(processed_input_codes))} unprocessed inputs')
 
 
   def run_reading_comprehension(self, model: RunnableModel, config, cost_check_callback=None) -> Union[TaskOutput, None]:
