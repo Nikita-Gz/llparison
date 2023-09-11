@@ -173,7 +173,7 @@ class DatabaseConnector:
         hf_inferable=model_obj['tracking_history'][0]['hf_inference_api_supported'],
         available=model_obj['tracking_history'][0]['available'],
         price=model_obj['tracking_history'][0]['price_completion'],
-        discount=model_obj['tracking_history'][0]['discount']))
+        discount=model_obj['tracking_history'][0].get('discount', 0.0)))
     return models_to_return
   
 
@@ -243,7 +243,7 @@ class DatabaseConnector:
         hf_inferable=model_obj['tracking_history'][0]['hf_inference_api_supported'],
         available=model_obj['tracking_history'][0]['available'],
         price=model_obj['tracking_history'][0]['price_completion'],
-        discount=model_obj['tracking_history'][0]['discount'])
+        discount=model_obj['tracking_history'][0].get('discount', 0.0))
 
 
   def append_output_to_experiment(self, experiment_id, output):
