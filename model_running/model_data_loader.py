@@ -25,7 +25,7 @@ class DatabaseConnector:
       self,
       testing_mode: bool,
       insert_testing_models: bool,
-      data_to_insert_by_default=None) -> None:
+      data_to_insert_by_default: Union[Dict[str, List[Dict]], None]=None) -> None:
     # use a mock DB if the app is not on k8s
 
     running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
