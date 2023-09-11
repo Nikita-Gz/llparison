@@ -46,22 +46,6 @@ class ModelRunner:
     #self._model_run_function = None
 
 
-  def get_run_function(self):
-    self._model_run_function = None
-    if self.model.source == 'OpenRouter':
-      return self.run_openrouter_payload
-    elif self.model.source == 'hf' and self.model.hf_inferable:
-      return lambda payload: asyncio.run(self.run_hf_inference_payload(payload))
-    elif self.model.source == 'hf' and not self.model.hf_inferable:
-      return self.run_hf_local
-    else:
-      raise NotImplementedError(f"Running from source {self.model_source} is NYI")
-
-
-  def _get_local_model_if_exists(self) -> None:
-    pass
-
-
   def run_hf_local(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
     if self.model.owner != '':
       model_name = self.model.owner + '/' + self.model.name
