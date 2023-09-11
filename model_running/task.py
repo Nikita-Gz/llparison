@@ -107,7 +107,7 @@ class Task:
     def get_combinations_for_rc():
       def get_configs_for_llm(model: RunnableModel) -> List[Config]:
         config1 = Config()
-        config1.set_parameter('temperature', 0.5)
+        config1.set_parameter('temperature', 0.01)
         config1.set_parameter('top-p', 0.5)
         return [config1]
       
