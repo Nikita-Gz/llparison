@@ -204,12 +204,14 @@ class Task:
   
 
   def _compute_prompts_cost(self, prompts: List[str], model_runner: ModelRunner) -> float:
-    if model_runner.model.price == 0:
+    true_price = model_runner.model.get_price_with_discount()
+    log.info(f'Model\'s true price is {true_price}')
+    if true_price == 0:
       total_cost = 0
     else:
       token_count = model_runner.count_tokens(prompts)
       log.info(f'Total token count is {token_count}')
-      total_cost = model_runner.model.price * token_count
+      total_cost = true_price * token_count
 
     log.info(f'Total token cost is {total_cost}')
     return total_cost

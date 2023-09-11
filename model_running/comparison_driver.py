@@ -59,7 +59,7 @@ def test_runner():
 
 
 def test_runner_local():
-  model = RunnableModel('a', '', 'gpt2', 'hf', 1000, False, True, 0)
+  model = RunnableModel('a', '', 'gpt2', 'hf', 1000, False, True, 0, 0)
   config = Config()
   runner = ModelRunner(model, config)
   run_output = runner.run_model(['Hello,']*5)
