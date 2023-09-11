@@ -6,6 +6,7 @@ import json
 import requests
 import pandas as pd
 import logging
+import datetime
 
 from typing import *
 
@@ -39,11 +40,13 @@ def get_openrouter_models(tracking_date: str) -> Dict[str, Dict]:
           'context_size': int(model['context_length']),
           'price_prompt': float(model['pricing']['prompt']),
           'price_completion': float(model['pricing']['completion']),
-          'prompt_limit': int(model['input_limits']['prompt_tokens']),
-          'max_tokens_limit': int(model['input_limits']['max_tokens'])
+          'discount': float(model['pricing'].get('discount', 0.0))
+          #'prompt_limit': int(model['input_limits']['prompt_tokens']),
+          #'max_tokens_limit': int(model['input_limits']['max_tokens'])
         }
       ]
     }
+    log.info(f'Saving model {model_data}')
     #assert set(model_data.keys()) == set(DatabaseConnector.columns_list)
     formatted_models.append(model_data)
   log.info(f'Got {len(formatted_models)} models from OpenRouter')
@@ -54,6 +57,7 @@ def scan_for_new_models(tracking_date: str, db_connector: DatabaseConnector) -> 
   openrouter_df = get_openrouter_models(tracking_date)
   # scan for other models here too
 
+  # filters out already known models from those that were detected just now
   currently_found_models = [] + openrouter_df
   previously_unknown_models = []
   previously_known_models_ids = [model['_id'] for model in list(db_connector.get_models())]
@@ -97,14 +101,16 @@ def update_hf_model(model: Dict, db_connector: DatabaseConnector, tracking_date:
 
 
 def update_openrouter_models(models: List[Dict], db_connector: DatabaseConnector, tracking_date: str):
+  log.info(f'Updating {len(models)} OpenRouter models')
   currently_available_models = get_openrouter_models(tracking_date)
   currently_available_models_dict = {model['_id']:model for model in currently_available_models}
+  log.info(f'Fount online data on {len(currently_available_models)} currently available models')
   #ids_of_models_to_update = [model['_id'] for model in models]
 
   for model_to_update in models:
     if model_to_update['_id'] in currently_available_models_dict.keys():
       db_connector.save_model_tracking_properly(
-        currently_available_models_dict[model_to_update['_id']]['tracking_history'][0],
+        currently_available_models_dict[model_to_update['_id']],
         tracking_date)
 
 
@@ -122,9 +128,7 @@ def update_existing_models_tracking(tracking_date: str, db_connector: DatabaseCo
   update_openrouter_models([model for model in all_models if model['source'] == 'OpenRouter'], db_connector, tracking_date)
 
 
-def reworked_perform_tracking(tracking_date: str):
-  db = DatabaseConnector()
-
+def reworked_perform_tracking(tracking_date: str, db: DatabaseConnector):
   previously_unknown_models = scan_for_new_models(tracking_date, db)
   db.save_models(previously_unknown_models)
 
@@ -140,17 +144,17 @@ def perform_tracking(tracking_date: str):
   # 4) check availability of the models, drop those for which the check is applicable but failed
   # 5) save currently trackable models to db, saving first tracking date if the model is present in list #1
 
-  print('\n\nStarting tracking on date {tracking_date}')
+  print(f'\n\nStarting tracking on date {tracking_date}')
 
-  db = DatabaseConnector()
+  db = DatabaseConnector(
+    testing_mode=True,
+    insert_testing_models=False,
+    data_to_insert_by_default=None)
+  reworked_perform_tracking(tracking_date, db)
+  for model in list(db.models.find()):
+    print(model)
+    print('*'*20)
 
-  # only works with openrouter rn
-
-  models_trackable_now = get_openrouter_models(tracking_date)
-  log.info(f'Got {len(models_trackable_now)} models_trackable_now')
-  for model in models_trackable_now:
-    log.info(f'Saving model {model}')
-    db.save_model_tracking_properly(model, tracking_date)
 
 if __name__ == '__main__':
-  perform_tracking('aaaaa')
+  perform_tracking(str(datetime.datetime.now()))

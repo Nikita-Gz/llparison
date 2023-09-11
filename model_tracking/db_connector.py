@@ -57,16 +57,8 @@ class DatabaseConnector:
   # saves new model if it is not tracked yet, adds one tracking entry if it is
   def save_model_tracking_properly(self, model_dict, dt):
     _id = model_dict['_id']
-    tracking_record_data = {
-      'date': dt,
-      'hf_inference_api_supported': model_dict['hf_inference_api_supported'],
-      'available': model_dict['available'],
-      'context_size': model_dict['context'],
-      'price_prompt': model_dict['price_prompt'],
-      'price_completion': model_dict['price_completion'],
-      'prompt_limit': model_dict['prompt_limit'],
-      'max_tokens_limit': model_dict['max_tokens_limit'],
-    }
+    log.info(f'Saving model tracking for {_id}')
+    tracking_record_data = model_dict['tracking_history'][0]
 
     existing_model = self.models.find_one(_id)
     if existing_model is not None:
