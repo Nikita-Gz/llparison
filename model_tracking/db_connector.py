@@ -1,15 +1,45 @@
 import pandas as pd
 import pymongo
+import mongomock
+import logging
+import os
+from os import environ
 from typing import *
+
+log = logging.getLogger(os.path.basename(__file__))
+logging.basicConfig(level=logging.INFO)
 
 class DatabaseConnector:
   columns_list = ['first_tracked_on', 'last_tracked_on', 'available', 'original_name', 'owner', 'name', 'price_prompt', 'ff_inference_api_supported', 'source', 'price_completion', 'context', 'prompt_limit', 'max_tokens_limit']
 
-  def __init__(self) -> None:
-    #return
-    self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
+  def __init__(
+      self,
+      testing_mode: bool,
+      insert_testing_models: bool, # NYI
+      data_to_insert_by_default: Union[Dict[str, List[Dict]], None]) -> None:
+    
+    running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
+    real_data_mode = running_on_k8s and not testing_mode
+    log.info(f'real_data_mode: {real_data_mode}')
+    if real_data_mode:
+      self.mongo_client = pymongo.MongoClient("mongodb://mongodb/", username='root', password='root')
+    else:
+      self.mongo_client = mongomock.MongoClient()
+
     self.db = self.mongo_client["llparison_db"]
     self.models = self.db['models']
+
+    if data_to_insert_by_default is not None:
+      self._insert_default_data_in_collections(data_to_insert_by_default)
+
+
+  def _insert_default_data_in_collections(self, data: Dict[str, List[Dict]]):
+    for collection, items in data.items():
+      try:
+        self.db[collection].insert_many(items)
+      except Exception as e:
+        log.warn(f'Got a default data write error: \n' + str(e))
+
 
   # todo: verify columns?
 
