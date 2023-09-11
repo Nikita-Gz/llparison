@@ -172,7 +172,7 @@ class DatabaseConnector:
         context_size=model_obj['tracking_history'][0]['context_size'],
         hf_inferable=model_obj['tracking_history'][0]['hf_inference_api_supported'],
         available=model_obj['tracking_history'][0]['available'],
-        price=model_obj['tracking_history'][0]['price_completion'],
+        price=max(model_obj['tracking_history'][0]['price_completion'], model_obj['tracking_history'][0]['price_prompt']),
         discount=model_obj['tracking_history'][0].get('discount', 0.0)))
     return models_to_return
   
@@ -242,7 +242,7 @@ class DatabaseConnector:
         context_size=model_obj['tracking_history'][0]['context_size'],
         hf_inferable=model_obj['tracking_history'][0]['hf_inference_api_supported'],
         available=model_obj['tracking_history'][0]['available'],
-        price=model_obj['tracking_history'][0]['price_completion'],
+        price=max(model_obj['tracking_history'][0]['price_completion'], model_obj['tracking_history'][0]['price_prompt']),
         discount=model_obj['tracking_history'][0].get('discount', 0.0))
 
 
