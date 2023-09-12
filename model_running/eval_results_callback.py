@@ -109,7 +109,7 @@ class EvaluationResultsCallback:
     model_answer_id = self._get_reading_comprehension_answer_id_from_model_output(raw_output)
     correct_answer_letter = self.test_data[input_code]['answer']
     correct_answer_id = self.alphabet2idx[correct_answer_letter]
-    model_answer_letter = self.idx2alphabet.get(model_answer_id, '-')
+    model_answer_letter = self.idx2alphabet.get(model_answer_id, None)
     correct = model_answer_id is not None and model_answer_id == correct_answer_id
     processed_output = {
       'interpreted_output': model_answer_letter,
