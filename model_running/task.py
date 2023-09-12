@@ -47,6 +47,7 @@ class Task:
       options_text += f'{letter}) {option_text}\n'
     options_text = options_text.strip()
     final_text = ''.join([
+      'Read the text and answer the question correctly\n',
       'Text:\n', text,
       '\nQuestion: ', question_text,
       '\nOptions:\n', options_text,
