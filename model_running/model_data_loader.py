@@ -2,6 +2,7 @@
 
 import pandas as pd
 import pymongo
+import pickle
 from os import environ
 from typing import *
 import mongomock
@@ -46,9 +47,31 @@ class DatabaseConnector:
     if data_to_insert_by_default is not None:
       self._insert_default_data_in_collections(data_to_insert_by_default)
 
+
+  _DEFAULT_DUMP_PATH = './db_dump'
+  def load_data_from_file(self, path: str = _DEFAULT_DUMP_PATH):
+    log.info('Loading data from file')
+    with open(path, 'rb') as file:
+      data = pickle.load(file)
+    self._insert_default_data_in_collections(data)
+    log.info('Loaded data from file')
+
+
+  def save_data_to_file(self, path: str = _DEFAULT_DUMP_PATH):
+    log.info('Saving data to file')
+    data = {
+      'models': list(self.models.find()),
+      'experiments': list(self.experiments.find())
+    }
+    with open(path, 'wb') as file:
+      pickle.dump(data, file)
+    log.info('Saved data to file')
+
   
   def _insert_default_data_in_collections(self, data: Dict[str, List[Dict]]):
+    log.info(f'Inserting default data in {len(data)} collections')
     for collection, items in data.items():
+      log.info(f'Inserting {len(items)} default items in {collection}')
       try:
         self.db[collection].insert_many(items)
       except Exception as e:

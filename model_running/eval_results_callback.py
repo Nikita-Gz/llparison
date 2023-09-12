@@ -1,6 +1,7 @@
 import string
 import re
 import logging
+import pickle
 from typing import *
 
 from model_data_loader import DatabaseConnector
@@ -22,6 +23,7 @@ class EvaluationResultsCallback:
                validation_data=None,
                db_enabled=True,
                db_cache_limit=500,
+               save_db_on_cache_flush: Union[str, None]=None,
                **kwargs) -> None:
     self.db_connection = db_connection
     self.experiment_id = experiment_id
@@ -29,6 +31,7 @@ class EvaluationResultsCallback:
     self.db_enabled = db_enabled
     self.test_data = validation_data # type: Union[None, Dict]
     self.arguments = kwargs # kwargs are task-specific data
+    self.save_db_on_cache_flush = save_db_on_cache_flush
 
     if existing_processed_outputs is None or len(existing_processed_outputs) == 0:
       self.processed_outputs = dict()
@@ -50,6 +53,9 @@ class EvaluationResultsCallback:
   def _flush_the_cache(self):
     log.info(f'Writing {len(self._cached_output_writes)} outputs to DB')
     self.db_connection.append_many_outputs_to_experiments(self.experiment_id, self._cached_output_writes)
+    if self.save_db_on_cache_flush is not None:
+      log.info(f'Dumping DB')
+      self.db_connection.save_data_to_file()
     self._cached_output_writes = []
 
 
@@ -103,7 +109,7 @@ class EvaluationResultsCallback:
     model_answer_id = self._get_reading_comprehension_answer_id_from_model_output(raw_output)
     correct_answer_letter = self.test_data[input_code]['answer']
     correct_answer_id = self.alphabet2idx[correct_answer_letter]
-    model_answer_letter = self.idx2alphabet[model_answer_id]
+    model_answer_letter = self.idx2alphabet.get(model_answer_id, '-')
     correct = model_answer_id is not None and model_answer_id == correct_answer_id
     processed_output = {
       'interpreted_output': model_answer_letter,

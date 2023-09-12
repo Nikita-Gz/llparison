@@ -225,7 +225,8 @@ class Task:
       date: datetime.datetime,
       cost_limit=None,
       db_cache_limit=500,
-      cost_callback: Union[CostCallback, None] = None):
+      cost_callback: Union[CostCallback, None] = None,
+      save_db_on_cache_flush: Union[str, None]=None):
     '''
     1) Check for unfinished experiments in DB (pick a random one if there are)
     2) Get the list of known models
@@ -280,7 +281,8 @@ class Task:
       existing_processed_outputs=already_completed_outputs,
       validation_data=rc_questions,
       db_enabled=True,
-      db_cache_limit=db_cache_limit)
+      db_cache_limit=db_cache_limit,
+      save_db_on_cache_flush=save_db_on_cache_flush)
     try:
       runner.run_model(prompts_dict, callback=evaluation_callback)
       evaluation_callback.finalize_evaluation()
@@ -377,10 +379,16 @@ class Task:
       db_connection: DatabaseConnector,
       date: datetime.datetime,
       cost_limit=None,
-      db_cache_limit=500) -> TaskOutput:
+      db_cache_limit=500,
+      save_db_on_cache_flush: Union[str, None]=None) -> TaskOutput:
     if self.type == TaskType.READING_COMPREHENSION:
       log.info(f'Running reading comprehension on date {date} with cost limit {cost_limit}')
-      return self.run_reworked_reading_comprehension(db_connection, date, cost_limit, db_cache_limit=db_cache_limit)
+      return self.run_reworked_reading_comprehension(
+        db_connection,
+        date,
+        cost_limit,
+        db_cache_limit=db_cache_limit,
+        save_db_on_cache_flush=save_db_on_cache_flush)
     else:
       raise NotImplementedError(f'Tried running an unsupported task type, {self.type}')
 

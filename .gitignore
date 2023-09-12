@@ -6,3 +6,4 @@
 s/
 __pycache__/
 secrets.yaml
+db_dump

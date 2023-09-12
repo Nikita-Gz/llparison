@@ -82,7 +82,7 @@ class ModelRunner:
     for input_code, payload in payloads.items():
       generated_text = model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
       callback.record_output(generated_text, input_code=input_code)
-      if iteration % 10:
+      if iteration % 10 == 0:
         log.info(f'Processed {iteration} inputs out of {len(payloads)}')
         log.info(f'Example output: {generated_text}')
       iteration += 1
@@ -134,13 +134,16 @@ class ModelRunner:
 
 
   # payloads - dict of {input_key: prompt}
-  def run_model(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
+  def run_model(
+      self, payloads: Dict[str, str], callback: EvaluationResultsCallback,
+      count_tokens=False):
     # give a warning if the prompt is > context size
     log.info(f'Running model {self.model._id}')
 
-    log.info(f'Counting tokens')
-    payload_size = self.count_tokens(list(payloads.values()))
-    log.info(f'{payload_size} tokens')
+    if count_tokens:
+      log.info(f'Counting tokens')
+      payload_size = self.count_tokens(list(payloads.values()))
+      log.info(f'{payload_size} tokens')
     #if payload_size > self.model.context_size:
     #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
     
