@@ -14,17 +14,21 @@ from typing import *
 import os
 import random
 
-models_cache = os.getcwd() + '/.hf/hfmodels/'
-idksomeothercache = os.getcwd() + '/.hf/hfother/'
-os.environ['TRANSFORMERS_CACHE'] = models_cache
-os.environ['HF_DATASETS_CACHE'] = idksomeothercache
+# todo: decide on this
+#models_cache = os.getcwd() + '/.hf/hfmodels/'
+#idksomeothercache = os.getcwd() + '/.hf/hfother/'
+#os.environ['TRANSFORMERS_CACHE'] = models_cache
+#os.environ['HF_DATASETS_CACHE'] = idksomeothercache
+
+import torch
+from transformers import AutoTokenizer
 from transformers import pipeline
 
 from run_config import Config
 from runnable_model_data import RunnableModel
 from eval_results_callback import EvaluationResultsCallback
 
-log = logging.getLogger("task.py")
+log = logging.getLogger(os.path.basename(__file__))
 logging.basicConfig(level=logging.INFO)
 
 
@@ -42,16 +46,24 @@ class ModelRunner:
     self.model = model
     self.config = config
 
+    # creates the name used for accessing HF repositories
+    if self.model.owner != '':
+      self._hf_model_name = self.model.owner + '/' + self.model.name
+    else:
+      self._hf_model_name = self.model.name
+
     # todo: eeh think about hf inference failing if it's unavailable?
     #self._model_run_function = None
 
 
   def run_hf_local(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
-    if self.model.owner != '':
-      model_name = self.model.owner + '/' + self.model.name
-    else:
-      model_name = self.model.name
-    model_pipeline = pipeline(model=model_name)
+    log.info(f'Running model {self.model._id} locally as HF model')
+
+    model_pipeline = pipeline(
+      "text-generation",
+      model=self._hf_model_name,
+      device_map="auto",
+      torch_dtype=torch.float16)
 
     parameters_to_get_and_defaults = {
       'temperature': 2.0,
@@ -66,15 +78,20 @@ class ModelRunner:
     for key, default_value in parameters_to_get_and_defaults.items():
       final_parameters[key] = self.config.get_parameter(key, default=default_value)
 
+    iteration = 0
     for input_code, payload in payloads.items():
       generated_text = model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
       callback.record_output(generated_text, input_code=input_code)
+      if iteration % 10:
+        log.info(f'Processed {iteration} inputs out of {len(payloads)}')
+        log.info(f'Example output: {generated_text}')
+      iteration += 1
 
 
   async def _query_hf_single(self, payload: Union[str, List], input_code: str, callback: EvaluationResultsCallback, session) -> dict:
     MAX_RETRIES = 10
     retry_count = 0
-    API_URL = '/'.join(['https://api-inference.huggingface.co/models', self.model.owner, self.model.name])
+    API_URL = 'https://api-inference.huggingface.co/models/' + self._hf_model_name
     data = json.dumps(payload)
 
     #payload_part_to_show = payload[:100]
@@ -104,6 +121,7 @@ class ModelRunner:
 
 
   def _run_rc_test_function(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
+    log.info(f'Running model {self.model._id} as a RC test model')
     #rng = random.Random()
     #rng.seed(11037)
     #payloads_size = len(payloads)
@@ -120,6 +138,7 @@ class ModelRunner:
     # give a warning if the prompt is > context size
     log.info(f'Running model {self.model._id}')
 
+    log.info(f'Counting tokens')
     payload_size = self.count_tokens(list(payloads.values()))
     log.info(f'{payload_size} tokens')
     #if payload_size > self.model.context_size:
@@ -138,6 +157,7 @@ class ModelRunner:
 
 
   def run_openrouter_payload(self, payloads, callback: EvaluationResultsCallback) -> str:
+    log.info(f'Running model {self.model._id} as OpenRouter model')
     raise NotImplementedError('Openrouter is WIP')
     return 'OpenRouter response. WIP'
 
@@ -154,6 +174,8 @@ class ModelRunner:
 
 
   async def run_hf_inference_payload(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
+    log.info(f'Running model {self.model._id} via HF inference API')
+
     parameters_to_get_and_defaults = {
       'temperature': 0.0000001,
       'top_p': 0.92,
@@ -180,8 +202,17 @@ class ModelRunner:
 
 
   def count_tokens(self, payloads: Union[str, List[str]]) -> int:
+    log.info(f'Counting tokens')
     # todo: make it supprot different encodings depending on the model
-    tokenizer = tiktoken.get_encoding('cl100k_base')
+
+    if self.model.source == 'hf':
+      log.info(f'Using HF tokenizer for {self._hf_model_name}')
+      tokenizer = AutoTokenizer.from_pretrained(self._hf_model_name)
+      tokenizer.encode_batch = lambda texts: [tokenizer.encode(text) for text in texts]
+    else:
+      DEFAULT_TOKENIZER = 'cl100k_base'
+      log.info(f'Using default tokenizer: {DEFAULT_TOKENIZER}')
+      tokenizer = tiktoken.get_encoding('cl100k_base')
 
     token_count = 0
     if isinstance(payloads, str):
