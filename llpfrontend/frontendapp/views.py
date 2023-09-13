@@ -2,10 +2,13 @@ from django.shortcuts import render
 from django.template import loader
 from django.http import HttpResponse, HttpRequest, Http404
 
-from .data_handling import (DatabaseConnector, get_unique_config_params_in_evaluations, create_evaluations_df, get_possible_config_combinations_in_evaluations, get_unique_input_codes_from_evaluations,
-                            count_interpreted_answers_for_input_code,
-                            RC_QUESTIONS, RC_TEXTS
+from .data_handling import (
+  DatabaseConnector, get_unique_config_params_in_evaluations, create_evaluations_df, get_possible_config_combinations_in_evaluations, get_unique_input_codes_from_evaluations,
+  count_interpreted_answers_for_input_code,
+  prettify_config_dict,
+  RC_QUESTIONS, RC_TEXTS
 )
+from .prompt_constructor import PromptConstructor
 
 import random
 from typing import *
@@ -16,7 +19,7 @@ import logging
 import string
 
 log = logging.getLogger("views.py")
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 conn = DatabaseConnector()
@@ -154,22 +157,35 @@ def _draw_rc_results(request) -> HttpResponse:
   input_code = request.GET.get('input_code', None)
   task_type = request.GET.get('task_type', None)
   log.info(f'Drawing results for input code {input_code} and task type {task_type}')
-  llm_configs = json.loads(request.GET.get('llm_configs', None))
+  llm_configs = json.loads(request.GET.get('llm_configs', None)) # type: List[Dict]
 
-  interpreted_output_counts_per_model = dict()
+  log.warning(f'Configs being tested: {llm_configs}')
+
+  question_details = RC_QUESTIONS[input_code]
+  question_context = RC_TEXTS[question_details['text_id']]
+
+  # todo: rework prompts to be sent on-request
+  prompt_and_interpreted_output_counts_per_readable_llm_config_combination = dict()
   for llm_config_combination in llm_configs:
+    log.info(f'Counting for combination {llm_config_combination}')
     evals = conn.get_evaluations_for_llm_config_task_combination(task_type, llm_config_combination)
+    log.info(f'Got {len(evals)} evaluations')
     interpreted_output_counts_for_model = count_interpreted_answers_for_input_code(evals, input_code)
-    interpreted_output_counts_per_model[llm_config_combination['model_id']] = interpreted_output_counts_for_model
+    log.info(f'Counts: {interpreted_output_counts_for_model}')
+    readable_combination_name = llm_config_combination['model_id'] + ' : ' + prettify_config_dict(llm_config_combination['config'])
+    prompt_and_interpreted_output_counts_per_readable_llm_config_combination[readable_combination_name] = {
+      'prompt': PromptConstructor(task_type, llm_config_combination['config']).construct_prompt(text=question_context, question_dict=question_details),
+      'counts':interpreted_output_counts_for_model
+    }
 
   question_details = RC_QUESTIONS[input_code]
   context = {
-    'question_context': RC_TEXTS[question_details['text_id']],
+    'question_context': question_context,
     'input_code': input_code,
     'question': question_details['question'],
     'options': [f'{idx2alphabet.get(i)}) {option}' for i, option in enumerate(question_details['options'])],
     'answer': question_details['answer'],
-    'interpreted_output_counts_per_model': interpreted_output_counts_per_model
+    'prompt_and_interpreted_output_counts_per_readable_llm_config_combination': prompt_and_interpreted_output_counts_per_readable_llm_config_combination
   }
   print(context)
   return render(request, "frontendapp/rc_results_ui.html", context)
@@ -179,6 +195,19 @@ def _draw_results(request) -> HttpResponse:
   task_type = request.GET.get('task_type', None)
   function_selector_by_task = {
     'Reading Comprehension': _draw_rc_results
+  }
+  return function_selector_by_task[task_type](request)
+
+
+def _draw_rc_prompt(request: HttpRequest) -> HttpResponse:
+  input_code = request.GET.get('input_code', None)
+  task_type = request.GET.get('task_type', None)
+
+
+def _draw_prompt_text_window(request: HttpRequest) -> HttpResponse:
+  task_type = request.GET.get('task_type', None)
+  function_selector_by_task = {
+    'Reading Comprehension': _draw_rc_prompt
   }
   return function_selector_by_task[task_type](request)
 
@@ -203,6 +232,9 @@ def task_results_data(request: HttpRequest):
     final_data['input_codes'] = input_codes
   elif requested_data_type == 'evaluation_graphic':
     return _draw_results(request)
+  elif requested_data_type == 'prompt_text':
+    #task_type = request.GET.get('task_type', None)
+    pass
   else:
     raise Exception(f'Unknown requested_data_type of {requested_data_type}')
 

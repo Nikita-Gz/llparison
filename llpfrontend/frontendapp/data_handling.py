@@ -254,6 +254,14 @@ def count_interpreted_answers_for_input_code(evaluations: List[Dict], input_code
   return interpreted_output_counts
 
 
+def prettify_config_dict(config: Dict) -> str:
+  parameter_strings = []
+  for parameter_name, parameter_value in config.items():
+    parameter_string = f'{parameter_name}={parameter_value}'
+    parameter_strings.append(parameter_string)
+  return ', '.join(parameter_strings)
+
+
 # test
 if __name__ == '__main__':
   c = DatabaseConnector()
