@@ -19,6 +19,7 @@ from task_output import TaskOutput
 from task_type import TaskType, task_type_int_to_str
 from cost_callback import CostCallback
 from eval_results_callback import EvaluationResultsCallback
+from prompt_constructor import PromptConstructor
 
 # todo: !! custom tasks must be saved to db and loaded from it
 
@@ -38,23 +39,6 @@ class Task:
     # todo: make this work
     return True
 
-
-  def _construct_rc_prompt(self, text, question_dict):
-    question_text = question_dict['question']
-    options_text = ''
-    for i, option_text in enumerate(question_dict['options']):
-      letter = self.idx2alphabet[i]
-      options_text += f'{letter}) {option_text}\n'
-    options_text = options_text.strip()
-    final_text = ''.join([
-      'Read the text and answer the question correctly\n',
-      'Text:\n', text,
-      '\nQuestion: ', question_text,
-      '\nOptions:\n', options_text,
-      '\nThe correct answer is the letter:'])
-    return final_text
-  
-
   def _load_raw_reading_comprehension_data(self) -> Tuple[Dict, Dict]:
     log.info('Loading RC dataset')
     with open("./rc_dataset.txt", 'r') as file:
@@ -64,18 +48,34 @@ class Task:
     return rc_texts, rc_questions
 
 
-  # loads RACE data as prompts.
+  # loads RACE data as prompts, excluding a set of IDs.
   # Returns it as a dict of {question_id: prompt}
-  def _prepare_reading_comprehension_prompts(self, rc_texts: Dict[str, str], rc_questions: Dict[str, Dict], excluded_question_ids: set) -> Dict:
+  def _prepare_reading_comprehension_prompts(
+      self,
+      rc_texts: Dict[str, str],
+      rc_questions: Dict[str, Dict],
+      excluded_question_ids: set,
+      configuration: Config) -> Dict:
     log.info('Preparing RC prompts')
+
+    # prepared_prompts will have the following format:
+    # {
+    #   input_code: prompt_text
+    # }
     prepared_prompts = dict()
     excluded_count = 0
+    prompt_constructor = PromptConstructor(
+      task_type_str=task_type_int_to_str[self.type],
+      configuration_dict=configuration.to_dict())
+
     for question_id, question_dict in rc_questions.items():
       if question_id in excluded_question_ids:
         excluded_count += 1
         continue
       question_context_text = rc_texts[question_dict['text_id']]
-      prompt = self._construct_rc_prompt(question_context_text, question_dict)
+      prompt = prompt_constructor.construct_prompt(
+        text=question_context_text,
+        question_dict=question_dict)
       prepared_prompts[question_id] = prompt
     log.info(f'Loaded {len(prepared_prompts)} questions ({excluded_count} were excluded)')
     
@@ -257,7 +257,8 @@ class Task:
     rc_texts, rc_questions = self._load_raw_reading_comprehension_data()
     prompts_dict = self._prepare_reading_comprehension_prompts(
       rc_texts, rc_questions,
-      excluded_question_ids=set([output['input_code'] for output in already_completed_outputs]))
+      excluded_question_ids=set([output['input_code'] for output in already_completed_outputs]),
+      configuration=config)
     runner = ModelRunner(model, config)
 
     # process the cost
