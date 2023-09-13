@@ -34,9 +34,12 @@ class EvaluationResultsCallback:
     self.save_db_on_cache_flush = save_db_on_cache_flush
 
     if existing_processed_outputs is None or len(existing_processed_outputs) == 0:
+      log.info(f'Creating an empty processed outputs dict')
       self.processed_outputs = dict()
     else:
-      self.processed_outputs = existing_processed_outputs
+      log.info(f'Filling the existing processed outputs dict')
+      self.processed_outputs = {output['input_code']:output for output in existing_processed_outputs}
+      log.info(f'Filled with {len(self.processed_outputs)} outputs')
     
     self._cached_output_writes = []
     self._db_cache_limit = db_cache_limit
