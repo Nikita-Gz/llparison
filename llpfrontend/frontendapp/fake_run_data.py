@@ -69,6 +69,7 @@ def get_fake_testing_evaluations():
       'notes': '',
       'task_type': 'Reading Comprehension',
       'metrics': {'accuracy': 0.75, 'f1': 0.7},
+      # todo: make fake outputs for this model-config combo, otherwise comparison fails
     },
     {
       #'_id': uuid4().int,
@@ -83,17 +84,17 @@ def get_fake_testing_evaluations():
       'metrics': {'accuracy': 0.75, 'f1': 0.7},
       'outputs': [
         {
-          'input_code': 1,
+          'input_code': 'RACE:high10024.txt:0',
           'interpreted_output': 'B',
           'model_output': '(BBB)'
         },
         {
-          'input_code': 2,
+          'input_code': 'RACE:high10024.txt:1',
           'interpreted_output': 'B',
           'model_output': '(BBBBBB)'
         },
         {
-          'input_code': 3,
+          'input_code': 'RACE:high10024.txt:2',
           'interpreted_output': 'A',
           'model_output': '(AAAa)'
         },
