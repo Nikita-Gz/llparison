@@ -100,7 +100,7 @@ class Task:
     if experiment_count == 0:
       return None
     randomly_chosen_experiment = random.choice(unfinished_experiments)
-    log.info(f'Returning experiment {randomly_chosen_experiment}')
+    log.info(f'Returning experiment {randomly_chosen_experiment.get("_id")}')
     return randomly_chosen_experiment
 
 
@@ -108,8 +108,8 @@ class Task:
     def get_combinations_for_rc():
       def get_configs_for_llm(model: RunnableModel) -> List[Config]:
         config1 = Config()
-        config1.set_parameter('temperature', 0.01)
-        config1.set_parameter('top-p', 0.5)
+        #config1.set_parameter('temperature', 0.01)
+        config1.set_parameter('top-k', 1)
         return [config1]
       
       combinations = [] # type: List[Tuple[RunnableModel, Config]]
@@ -197,10 +197,11 @@ class Task:
 
   # returns the llm-config combination
   def _recover_unfinished_experiment_llm_config_combination(self, db_connection: DatabaseConnector, experiment: dict):
-    log.info(f'Recovering experiment {experiment}')
+    log.info(f'Recovering experiment {experiment.get("_id")}')
     model_id = experiment['model_id']
     model = db_connection.get_model_from_id(model_id)
     config = Config(experiment['config'])
+    log.info(f'Experiment: model_id={model_id}, date={experiment.get("date")}, config={config.to_dict()}, output amount={len(experiment.get("outputs"))}')
     return (model, config)
   
 

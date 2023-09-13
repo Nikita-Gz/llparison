@@ -45,8 +45,14 @@ db = DatabaseConnector(
     ]
   }
 )
-#db.load_data_from_file('./db_dump')
-#print(list(db.experiments.find()))
+
+DB_DUMP_FILE = './db_dump'
+def load_one_experiment_db_dump(db: DatabaseConnector):
+  db.load_data_from_file(DB_DUMP_FILE)
+  outputs = list(db.experiments.find())[0]['outputs']
+  log.info(f'Loaded {len(outputs)} experiment outputs')
+
+load_one_experiment_db_dump(db)
 
 task = Task(TaskType.READING_COMPREHENSION)
 
@@ -56,5 +62,5 @@ task.run_task(
   date=str(datetime.datetime.now()),
   cost_limit=None,
   db_cache_limit=500,
-  save_db_on_cache_flush='./db_dump'
+  save_db_on_cache_flush=DB_DUMP_FILE
 )

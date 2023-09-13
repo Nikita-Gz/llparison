@@ -56,20 +56,30 @@ class ModelRunner:
     #self._model_run_function = None
 
 
+  def _get_device_code(self) -> int:
+    if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+      return torch.cuda.current_device()
+    else:
+      return -1
+
+
   def run_hf_local(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
     log.info(f'Running model {self.model._id} locally as HF model')
+
+    #device_code = self._get_device_code()
+    #log.info(f'Running on device #{device_code}')
 
     model_pipeline = pipeline(
       "text-generation",
       model=self._hf_model_name,
-      device_map="auto",
+      device_map='auto',
       torch_dtype=torch.float16)
 
     parameters_to_get_and_defaults = {
-      'temperature': 2.0,
-      'top_p': 0.99,
-      'top_k': 5000,
-      'max_new_tokens': 5,
+      'temperature': 0.01,
+      'top_p': 0.9,
+      'top_k': 1,
+      'max_new_tokens': 3,
       'return_full_text': False,
       'do_sample': True,
     }
@@ -82,7 +92,7 @@ class ModelRunner:
     for input_code, payload in payloads.items():
       generated_text = model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
       callback.record_output(generated_text, input_code=input_code)
-      if iteration % 10 == 0:
+      if iteration % 1 == 0:
         log.info(f'Processed {iteration} inputs out of {len(payloads)}')
         log.info(f'Example output: {generated_text}')
       iteration += 1
