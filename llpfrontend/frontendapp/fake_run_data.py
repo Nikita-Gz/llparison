@@ -69,7 +69,23 @@ def get_fake_testing_evaluations():
       'notes': '',
       'task_type': 'Reading Comprehension',
       'metrics': {'accuracy': 0.75, 'f1': 0.7},
-      # todo: make fake outputs for this model-config combo, otherwise comparison fails
+      'outputs': [
+        {
+          'input_code': 'RACE:high10024.txt:0',
+          'interpreted_output': 'D',
+          'model_output': '(D)'
+        },
+        {
+          'input_code': 'RACE:high10024.txt:1',
+          'interpreted_output': 'D',
+          'model_output': 'D'
+        },
+        {
+          'input_code': 'RACE:high10024.txt:2',
+          'interpreted_output': 'C',
+          'model_output': '(C)'
+        },
+      ]
     },
     {
       #'_id': uuid4().int,
@@ -111,5 +127,22 @@ def get_fake_testing_evaluations():
       'notes': '',
       'task_type': 'Reading Comprehension',
       'metrics': {'accuracy': 0.75, 'f1': 0.7},
+      'outputs': [
+        {
+          'input_code': 'RACE:high10024.txt:0',
+          'interpreted_output': 'D',
+          'model_output': '(D)'
+        },
+        {
+          'input_code': 'RACE:high10024.txt:1',
+          'interpreted_output': 'D',
+          'model_output': 'D'
+        },
+        {
+          'input_code': 'RACE:high10024.txt:2',
+          'interpreted_output': 'C',
+          'model_output': '(C)'
+        },
+      ]
     },
   ]

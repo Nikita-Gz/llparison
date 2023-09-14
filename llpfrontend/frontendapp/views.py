@@ -3,8 +3,10 @@ from django.template import loader
 from django.http import HttpResponse, HttpRequest, Http404
 
 from .data_handling import (
-  DatabaseConnector, get_unique_config_params_in_evaluations, create_evaluations_df, get_possible_config_combinations_in_evaluations, get_unique_input_codes_from_evaluations,
+  DatabaseConnector, get_unique_config_params_in_evaluations, create_metrics_df, get_possible_config_combinations_in_evaluations, get_unique_input_codes_from_evaluations,
   count_interpreted_answers_for_input_code,
+  filter_experiments_by_filters,
+  aggregate_metrics_from_experiments,
   prettify_config_dict,
   RC_QUESTIONS, RC_TEXTS
 )
@@ -17,6 +19,7 @@ import copy
 import json
 import logging
 import string
+from collections import Counter
 
 log = logging.getLogger("views.py")
 logging.basicConfig(level=logging.DEBUG)
@@ -107,14 +110,88 @@ def convert_to_numeric_if_possible(value: Any) -> Union[float, Any]:
     return value
 
 
-def get_metrics_data_for_one_model(request: HttpRequest):
+def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]:
+  """Creates a list of dicts describing a task and necessary graphs for it
+
+  Return format:
+  [
+    {
+      task_name: str,
+      graphs:
+      [
+        {
+          graph_name: str,
+          values:
+          [
+            {
+              name: str,
+              value: float
+            }
+          ]
+        }
+      ]
+    }
+  ]
+
+  Reading Comprehension task will add a graph with interpreted answers distribution
+  """
+  log.info(f'Creating graphs for the model')
+  
+
+  def create_metrics_graph_data_dict(metrics: Dict[str, float]) -> Dict[str, Union[str, Dict]]:
+    log.info(f'Creating metric graph')
+    data_dict = {'graph_name': 'Metrics', 'values': []}
+    data_values = data_dict['values'] # type: list
+    for metric_name, metric_value in metrics.items():
+      data_values.append({'name': metric_name, 'value': metric_value})
+    return data_dict
+  
+
+  def create_RC_answer_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
+    log.info(f'Creating RC answer distrigution graph')
+    data_dict = {'graph_name': 'Answer Distribution', 'values': []}
+    data_values_list = data_dict['values'] # type: list
+
+    interpreted_answer_counter = Counter()
+    for experiment in experiments:
+      all_interpreted_answers_in_experiment = [output['interpreted_output'] for output in experiment['outputs']]
+      interpreted_answer_counter.update(all_interpreted_answers_in_experiment)
+    log.info(f'Got the following counts: {interpreted_answer_counter}')
+
+    for interpreted_value_name, occurence_count in dict(interpreted_answer_counter).items():
+      data_values_list.append({'name': interpreted_value_name, 'value': occurence_count})
+    
+    return data_dict
+
+
+  # fills it up by tasks
+  final_data_list= []
+  unique_task_names_in_experiments = set([experiment['task_type'] for experiment in model_experiments])
+  for current_task_name in unique_task_names_in_experiments:
+    log.info(f'Creating graphs for the task {current_task_name}')
+    experiments_matching_the_task = [experiment for experiment in model_experiments if experiment['task_type'] in current_task_name]
+    task_record = {'task_name': current_task_name, 'graphs': []}
+    task_graphs = task_record['graphs'] # type: List[Dict]
+
+    # metrics graph
+    metrics_for_the_task = aggregate_metrics_from_experiments(experiments_matching_the_task)
+    task_graphs.append(create_metrics_graph_data_dict(metrics_for_the_task))
+
+    # special graphs based on the task
+    if current_task_name == 'Reading Comprehension':
+      task_graphs.append(create_RC_answer_distribution_graph_data_dict(experiments_matching_the_task))
+
+    final_data_list.append(task_record)
+  
+  return final_data_list
+
+
+def get_graphs_data_for_one_model(request: HttpRequest):
   log.info('\n'*4)
   model_id = request.GET.get('single_model_id', None)
   model_evaluations = conn.get_finished_evaluations_for_model(model_id)
   if len(model_evaluations) == 0:
     return Http404()
-  
-  all_possible_parameters = get_unique_config_params_in_evaluations(model_evaluations)
 
   filters_in_request = dict()
   date_filter = 'all'
@@ -125,20 +202,24 @@ def get_metrics_data_for_one_model(request: HttpRequest):
     elif parameter.startswith(filter_prefix):
       filter_name = parameter[len(filter_prefix):]
       filters_in_request[filter_name] = convert_to_numeric_if_possible(request.GET.get(parameter, 'all'))
+  log.info(f'Model ID: {model_id}')
   log.info(f'Filters: {filters_in_request}')
   log.info(f'Date filter: {date_filter}')
-  
-  computed_eval_data = create_evaluations_df(
-    model_evaluations,
-    all_possible_parameters,
-    filters_in_request,
+
+  # todo: consider moving it to after experiment filtering. Why not? What will this break?
+  all_possible_parameters = get_unique_config_params_in_evaluations(model_evaluations)
+
+  filtered_model_experiments = filter_experiments_by_filters(
+    experiments=model_evaluations,
+    config_filter_values=filters_in_request,
     date_filter=date_filter)
-  task_ratings = get_task_metrics_for_ui_from_computed_data(computed_eval_data)
+  
+  tasks_graphs_data = create_single_model_graphs_data(filtered_model_experiments)
 
   data = {
     'filters': get_config_filters_for_ui(all_possible_parameters, model_evaluations),
     'evaluation_error_message': 'There were errors in model evaluation' if False else '',
-    'task_ratings': task_ratings
+    'tasks_graphs_data': tasks_graphs_data
   }
 
   return HttpResponse(json.dumps(data))

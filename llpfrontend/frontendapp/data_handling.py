@@ -175,7 +175,7 @@ def get_unique_config_params_in_evaluations(evaluations: list) -> List[Dict]:
       existing_set_of_unique_vals = all_unique_config_params.get(config_param_name, set()) # type: Set
       all_unique_config_params[config_param_name] = existing_set_of_unique_vals.union({config_param_value,})
 
-  # todo: rework fking all of this, why do i need a defailt value if i am jsut goign to set it to "all" later?
+  # todo: rework fking all of this, why do i need a default value if i am just goign to set it to "all" later?
   final_list = []
   for parameter_name, unique_values in all_unique_config_params.items():
     unique_values = list(unique_values)
@@ -189,21 +189,88 @@ def get_unique_config_params_in_evaluations(evaluations: list) -> List[Dict]:
   return final_list
 
 
-"""
-Example cols in df: model_id, task_type, parameter_1, parameter_2, metric_name, value
-"""
-def create_evaluations_df(evaluations: list, all_possible_parameters: List[Dict], filter_values: Dict[str, Any], date_filter: str) -> pd.DataFrame:
+def filter_experiments_by_filters(
+    experiments: List[Dict],
+    config_filter_values: Dict[str, Any],
+    date_filter: str) -> List[Dict]:
+  """Leaves out only those experiments that have passed all of the filters
+  """
+  log.info(f'Applying filters to {len(experiments)} experiments')
+  experiments_that_have_passed_filtering = []
+  for experiment in experiments:
+    log.info(f'Applying filters to experiment "{experiment["_id"]}"')
+
+    # filtering by date
+    if date_filter is not None and date_filter != 'all' and experiment['date'] != date_filter:
+      log.info(f'Filtered out experiment {experiment["_id"]} because of the date filter ({date_filter} does not match {experiment["date"]})')
+      continue
+    
+    experiment_config = experiment['config'] # type: Dict[str, Any]
+    
+    # filtering by config parameters
+    did_experiment_pass_config_filters = True
+    for config_parameter_name, config_filter_value in config_filter_values.items():
+      log.info(f'Filtering by config parameter "{config_parameter_name}" by "{config_filter_value}"')
+      if config_filter_value == 'all':
+        # allows all values
+        log.info(f'Skipping filter {config_parameter_name} as it is set to "all"')
+      elif config_filter_value == 'none':
+        # disallows all values
+        if config_parameter_name in experiment_config.keys():
+          log.info(f'Experiment did not pass the filter (it contained the forbidden parameter)')
+          did_experiment_pass_config_filters = False
+          break
+      else:
+        # checks if the config parameter value matches the filter
+        experiment_config_value = experiment_config.get(config_parameter_name, None)
+        if experiment_config_value != config_filter_value:
+          log.info(f'Experiment did not pass the filter ({experiment_config_value} did not match {config_filter_value})')
+          did_experiment_pass_config_filters = False
+          break
+      log.info(f'Experiment has passed filtering by "{config_parameter_name}"')
+    
+    if did_experiment_pass_config_filters:
+      log.info(f'Experiment "{experiment["_id"]}" has passed all the filters')
+      experiments_that_have_passed_filtering.append(experiment)
+    else:
+      log.info(f'Experiment "{experiment["_id"]}" did not pass the fitlering')
+    
+  log.info(f'Got {len(experiments_that_have_passed_filtering)} experiments after the filtering')
+
+  return experiments_that_have_passed_filtering
+
+
+def aggregate_metrics_from_experiments(experiments: List[Dict]) -> Dict[str, float]:
+  """Computes averages for metrics present in the experiments list
+  """
+  # creates a dict of lists for all metrics present in the experiment set
+  all_metric_values = dict() # type Dict[str, List[float]]
+  for experiment in experiments:
+    for metric_name, metric_value in experiment['metrics'].items():
+      existing_metric_values_list = all_metric_values.get(metric_value, list())
+      all_metric_values[metric_name] = existing_metric_values_list + [metric_value]
+  
+  # computes the aggregate metrics
+  aggregate_values = dict()
+  for metric_name, metric_values_list in all_metric_values.items():
+    # todo: add more aggregation options besides averages
+    aggregate_values[metric_name] = sum(metric_values_list) / len(metric_values_list)
+
+  return aggregate_values
+
+
+def create_metrics_df(
+    experiments: list,
+    all_possible_parameters: List[Dict]) -> pd.DataFrame:
   """Returns a DF with following columns: model_id, task_type, metric_name, value
   """
+  log.info(f'Computing metrics for {len(experiments)} experiments')
   unique_params = [parameter['name'] for parameter in all_possible_parameters]
 
   # todo: ugh rework it to use pandas pivot table or smth
+  # This loop creates a DF with following columns: model_id, task_type, [parameter 1], ..., [parameter n], metric_name, value
   dicts_to_put_in_df = []
-  for evaluation in evaluations:
-    if date_filter is not None and date_filter != 'all' and evaluation['date'] != date_filter:
-      log.info(f'Filtered out {evaluation} because of the date filter ({date_filter})')
-      continue
-
+  for evaluation in experiments:
     model_id = evaluation['model_id']
     task_type = evaluation['task_type']
     
@@ -223,21 +290,6 @@ def create_evaluations_df(evaluations: list, all_possible_parameters: List[Dict]
       dicts_to_put_in_df.append(final_record)
   evals_pivot_table = pd.DataFrame(dicts_to_put_in_df)
   log.info(f'Created pivot table at length {len(evals_pivot_table)}')
-
-  # filters the table
-  for filter_name, filter_value in filter_values.items():
-    log.info(f'Filtering by {filter_name}')
-    if filter_value == 'all':
-      log.info(f'Skipping filter {filter_name}')
-    elif filter_value == 'none':
-      log.info(f'Filtering {filter_name} by none')
-      evals_pivot_table = evals_pivot_table[evals_pivot_table[filter_name].isna()]
-    else:
-      log.info(f'Filtering {filter_name} by {filter_value}')
-      print(evals_pivot_table)
-      evals_pivot_table = evals_pivot_table[evals_pivot_table[filter_name] == filter_value]
-      print(evals_pivot_table[filter_name] == filter_value)
-    log.info(f'DF length after the filter: {len(evals_pivot_table)}')
   
   return evals_pivot_table.groupby(
     ['model_id', 'task_type'] + ['metric_name'],
@@ -262,14 +314,3 @@ def prettify_config_dict(config: Dict) -> str:
     parameter_string = f'{parameter_name}={parameter_value}'
     parameter_strings.append(parameter_string)
   return ', '.join(parameter_strings)
-
-
-# test
-if __name__ == '__main__':
-  c = DatabaseConnector()
-  models = c.get_unique_model_ids_with_finished_evaluations()
-  model_id = 'hf::gpt2'
-  evals = c.get_finished_evaluations_for_model(model_id)
-  unique_params = get_unique_config_params_in_evaluations(evals)
-  a = create_evaluations_df(evals, unique_params, {'temperature': 1, 'testparam': 'none'}, 'all')
-  print(a)

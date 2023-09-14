@@ -34,18 +34,74 @@ function make_barchart(element_id, labels_list, data_list) {
 }
 
 function create_charts(response) {
-    task_ratings = response["task_ratings"]
+    tasks_graphs_data = response["tasks_graphs_data"]
+
+    /* tasks_graphs_data scheme:
+    [
+        {
+        task_name: str,
+        graphs:
+        [
+            {
+            graph_name: str,
+            values:
+            [
+                {
+                name: str,
+                value: float
+                }
+            ]
+            }
+        ]
+        }
+    ]
+    */
+
     charts_container = document.getElementById('charts')
     charts_container.textContent = ""
 
-    if (task_ratings.length == 0) {
+    if (tasks_graphs_data.length == 0) {
         var no_charts = document.createElement('label')
         no_charts.textContent = "No charts :c"
         charts_container.appendChild(no_charts)
     }
 
-    new_elements = []
-    chart_creators = []
+    tasks_graphs_data.forEach((task_graphs_data) => {
+        task_name = task_graphs_data["task_name"]
+
+        var task_name_header = document.createElement('h4')
+        task_name_header.textContent = "Graphs for task \"" + task_name + "\""
+        charts_container.appendChild(task_name_header)
+
+        // draws the actual graphs for this task
+        graphs_for_the_task = task_graphs_data["graphs"]
+        graphs_for_the_task.forEach((graph_data) => {
+            graph_name = graph_data['graph_name']
+            graph_values = graph_data['values']
+
+            // transforms graph values into a format edible by make_barchart
+            names_list = []
+            values_list = []
+            graph_values.forEach((graph_value) => {
+                names_list.push(task_name + ": " + graph_value["name"])
+                values_list.push(graph_value["value"])
+            })
+
+            var chart_div = document.createElement('div')
+            charts_container.appendChild(chart_div)
+
+            var el = document.createElement('canvas')
+            chart_id = task_name + "_" + graph_name + "_chart"
+            el.setAttribute('id', chart_id);
+            el.setAttribute('width', 400);
+            el.setAttribute('height', 100);
+            chart_div.appendChild(el)
+
+            make_barchart(chart_id, names_list, values_list)
+        })
+    })
+
+    /*
     task_ratings.forEach((task) => {
         task_name = task["task_name"]
         metric_names = []
@@ -69,13 +125,10 @@ function create_charts(response) {
         chart_div.appendChild(el)
 
         make_barchart(task_name + "_chart", metric_names, metric_values)
-
-        //chart_creators.push(function () {make_barchart(task_name + "_chart", metric_names, metric_values)})
     })
+    */
 
     document.getElementById("error_message_label").textContent = response["evaluation_error_message"]
-
-    //chart_creators.forEach((creator) => {creator()})
 }
 
 var filters_array = []
