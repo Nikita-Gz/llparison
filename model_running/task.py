@@ -9,6 +9,7 @@ import re
 import random
 import mongomock
 import datetime
+from dateutil.parser import parse as parse_date
 
 
 from model_runner import ModelRunner
@@ -108,8 +109,8 @@ class Task:
     def get_combinations_for_rc():
       def get_configs_for_llm(model: RunnableModel) -> List[Config]:
         config1 = Config()
-        #config1.set_parameter('temperature', 0.01)
-        config1.set_parameter('top-k', 1)
+        config1.set_parameter('temperature', 0.01)
+        config1.set_parameter('top-p', 0.5)
         return [config1]
       
       combinations = [] # type: List[Tuple[RunnableModel, Config]]
@@ -150,26 +151,43 @@ class Task:
       possible_combinations: List[Tuple[RunnableModel, Config]],
       db_connector: DatabaseConnector,
       current_date: datetime.datetime) -> List[Tuple[RunnableModel, Config]]:
+    """Picks out combinations that were either:
+    1) never tested
+    2) are using proprietary models, and some time has passed since the last evaluation
+    """
     # picks out combinations that either were never tested,
     # or are hosted by OpenRouter and haven't been tested in a while
     PROPRIETARY_MODEL_TIMEOUT = datetime.timedelta(days=31)
     PROPRIETARY_SOURCES_LIST = ['OpenRouter']
     combinations_to_evaluate = []
     for considered_combination in possible_combinations:
+      log.info(f'Considering model-config combination:\nModel: {considered_combination[0]._id}\nConfig: {considered_combination[1].to_dict()}')
       model, configuration = considered_combination
       model_source = model.source
       latest_experiment = db_connector.get_latest_evaluation_for_combination(model, task_type_int_to_str[self.type], configuration)
       if latest_experiment is None:
+        log.info(f'Combination was never tested completely, adding it to combinations up for evaluations')
         combinations_to_evaluate.append(considered_combination)
-      elif model_source not in PROPRIETARY_SOURCES_LIST:
-        combinations_to_evaluate.append(considered_combination)
-      elif (current_date - self._convert_date_to_datetime(latest_experiment['date'])) > PROPRIETARY_MODEL_TIMEOUT:
-        combinations_to_evaluate.append(considered_combination)
+      elif model_source in PROPRIETARY_SOURCES_LIST:
+        time_since_last_experiment = current_date - parse_date(latest_experiment['date'])
+        if time_since_last_experiment > PROPRIETARY_MODEL_TIMEOUT:
+          log.info(f'Combination is proprietary and was not tested in a while ({str(time_since_last_experiment)}), adding it to combinations up for evaluations')
+          combinations_to_evaluate.append(considered_combination)
+        else:
+          log.info(f'Combination is proprietary, but it was recently tested ({str(time_since_last_experiment)}), skipping it')
+      else:
+        log.info(f'Skipping combination')
     return combinations_to_evaluate
 
 
-  # returns a tuple of experiment ID and evaluation llm-config combination
-  def _create_new_experiment(self, db_connection: DatabaseConnector, date: datetime.datetime):
+  def _create_new_experiment(
+      self,
+      db_connection: DatabaseConnector,
+      date: datetime.datetime):
+    """Returns a tuple of experiment ID and llm-config combination.
+
+    Returns None if there was no applicable new experiment to create
+    """
     log.info(f'Creating a new experiment record for task {self.type} at {date}')
     models_for_evaluating = db_connection.get_models_available_for_evaluating()
     log.info(f'Got {len(models_for_evaluating)} models up for evaluations')
@@ -185,6 +203,7 @@ class Task:
     
     if len(combinations_up_for_evaluation) == 0:
       log.info(f'No combinations are up for evaluation in task {self.type} at date {date}')
+      return None, None
 
     combination_for_evaluation = random.choice(combinations_up_for_evaluation)
     experiment_id = db_connection.create_experiment_stump(
@@ -227,7 +246,7 @@ class Task:
       cost_limit=None,
       db_cache_limit=500,
       cost_callback: Union[CostCallback, None] = None,
-      save_db_on_cache_flush: Union[str, None]=None):
+      path_to_save_db_on_update: Union[str, None]=None):
     '''
     1) Check for unfinished experiments in DB (pick a random one if there are)
     2) Get the list of known models
@@ -246,6 +265,9 @@ class Task:
     already_completed_outputs = []
     if unfinished_experiment is None:
       experiment_id, combination_for_evaluation = self._create_new_experiment(db_connection, date)
+      if experiment_id is None:
+        log.info(f'Stopping the task as there is no applicable experiment to create')
+        return
     else:
       experiment_id = unfinished_experiment['_id']
       combination_for_evaluation = self._recover_unfinished_experiment_llm_config_combination(
@@ -284,7 +306,7 @@ class Task:
       validation_data=rc_questions,
       db_enabled=True,
       db_cache_limit=db_cache_limit,
-      save_db_on_cache_flush=save_db_on_cache_flush)
+      path_to_save_db_on_update=path_to_save_db_on_update)
     try:
       runner.run_model(prompts_dict, callback=evaluation_callback)
       evaluation_callback.finalize_evaluation()
@@ -301,6 +323,9 @@ class Task:
       log.info(f'Yes, all inputs were processed ({len(processed_input_codes)}) out of ({len(all_input_codes)})')
       evaluation_callback.compute_and_save_metrics()
       db_connection.mark_experiment_as_finished(experiment_id, too_expensive=False)
+      if path_to_save_db_on_update is not None:
+        log.info(f'Saving finalized DB')
+        db_connection.save_data_to_file(path_to_save_db_on_update)
     else:
       log.error(f'Not all input codes were processed, the experiment was not marked as finished: {len(all_input_codes.difference(processed_input_codes))} unprocessed inputs')
 
@@ -384,7 +409,7 @@ class Task:
       date: datetime.datetime,
       cost_limit=None,
       db_cache_limit=500,
-      save_db_on_cache_flush: Union[str, None]=None) -> TaskOutput:
+      path_to_save_db_on_update: Union[str, None]=None) -> TaskOutput:
     if self.type == TaskType.READING_COMPREHENSION:
       log.info(f'Running reading comprehension on date {date} with cost limit {cost_limit}')
       return self.run_reworked_reading_comprehension(
@@ -392,7 +417,7 @@ class Task:
         date,
         cost_limit,
         db_cache_limit=db_cache_limit,
-        save_db_on_cache_flush=save_db_on_cache_flush)
+        path_to_save_db_on_update=path_to_save_db_on_update)
     else:
       raise NotImplementedError(f'Tried running an unsupported task type, {self.type}')
 

@@ -23,7 +23,7 @@ class EvaluationResultsCallback:
                validation_data=None,
                db_enabled=True,
                db_cache_limit=500,
-               save_db_on_cache_flush: Union[str, None]=None,
+               path_to_save_db_on_update: Union[str, None]=None,
                **kwargs) -> None:
     self.db_connection = db_connection
     self.experiment_id = experiment_id
@@ -31,7 +31,7 @@ class EvaluationResultsCallback:
     self.db_enabled = db_enabled
     self.test_data = validation_data # type: Union[None, Dict]
     self.arguments = kwargs # kwargs are task-specific data
-    self.save_db_on_cache_flush = save_db_on_cache_flush
+    self.path_to_save_db_on_update = path_to_save_db_on_update
 
     if existing_processed_outputs is None or len(existing_processed_outputs) == 0:
       log.info(f'Creating an empty processed outputs dict')
@@ -46,19 +46,26 @@ class EvaluationResultsCallback:
   
 
   def _compute_reading_comprehension_metrics(self):
+    log.info(f'Computing metrics for reading comprehension')
     processed_output_values = self.processed_outputs.values()
     accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
-    return {
+    metrics = {
       'accuracy': accuracy
     }
+    log.info(f'Metrics: {metrics}')
+    return metrics
   
+
+  def _dump_db_if_applicable(self):
+    if self.path_to_save_db_on_update is not None:
+      log.info(f'Dumping DB')
+      self.db_connection.save_data_to_file(self.path_to_save_db_on_update)
+
 
   def _flush_the_cache(self):
     log.info(f'Writing {len(self._cached_output_writes)} outputs to DB')
     self.db_connection.append_many_outputs_to_experiments(self.experiment_id, self._cached_output_writes)
-    if self.save_db_on_cache_flush is not None:
-      log.info(f'Dumping DB')
-      self.db_connection.save_data_to_file()
+    self._dump_db_if_applicable()
     self._cached_output_writes = []
 
 
@@ -95,6 +102,7 @@ class EvaluationResultsCallback:
       raise NotImplementedError(f'Metrics for task {self.task} are NYI')
     
     self.db_connection.set_metrics_to_experiment(self.experiment_id, metrics)
+    self._dump_db_if_applicable()
 
 
   def _get_reading_comprehension_answer_id_from_model_output(self, model_output: str) -> Union[int, None]:

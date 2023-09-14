@@ -62,5 +62,5 @@ task.run_task(
   date=str(datetime.datetime.now()),
   cost_limit=None,
   db_cache_limit=500,
-  save_db_on_cache_flush=DB_DUMP_FILE
+  path_to_save_db_on_update=DB_DUMP_FILE
 )

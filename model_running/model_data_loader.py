@@ -10,6 +10,7 @@ import json
 import datetime
 import logging
 from pymongo import UpdateMany, UpdateOne
+from dateutil.parser import parse as parse_date
 import pymongo
 
 from runnable_model_data import RunnableModel
@@ -107,7 +108,7 @@ class DatabaseConnector:
       self,
       experiment: dict,
       config: Config) -> bool:
-    return experiment['config'] == config
+    return experiment['config'] == config.to_dict()
 
   
   def get_latest_evaluation_for_combination(
@@ -116,12 +117,12 @@ class DatabaseConnector:
       task_name: str,
       config: Config) -> Union[Dict, None]:
     latest_experiment = None
-    model_task_experiments = self.experiments.find({
+    model_task_experiments = list(self.experiments.find({
       'model_id': model._id,
       'task_type': task_name,
       'finished': True,
       'too_expensive': False,
-      })
+      }))
     experiments_with_matching_configs = [
       experiment for experiment in model_task_experiments
       if self._check_if_experiment_matches_config(experiment, config)
@@ -129,13 +130,9 @@ class DatabaseConnector:
 
     # finds the latest experiment
     for experiment in experiments_with_matching_configs:
-      current_experiment_date = experiment['date']
-      latest_experiment_date = latest_experiment['date']
-      #date = datetime.datetime.strptime(date)
-      current_date = datetime.datetime.strptime(current_experiment_date)
-      latest_date = datetime.datetime.strptime(latest_experiment_date)
-      if latest_experiment is None or current_date > latest_date:
-        latest_experiment = current_date
+      current_experiment_date = parse_date(experiment['date'])
+      if latest_experiment is None or current_experiment_date > parse_date(latest_experiment['date']):
+        latest_experiment = experiment
     
     return latest_experiment
 
@@ -149,6 +146,9 @@ class DatabaseConnector:
   # todo: verify columns?
 
   def get_models_available_for_evaluating(self) -> List[RunnableModel]:
+    """
+    Returns models that share the same latest present last tracking date
+    """
 
     # todo: CHECK IF MODELS EXIST
     assert self.models.count_documents({}) > 0, 'No models are present!'
