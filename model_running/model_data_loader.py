@@ -242,6 +242,7 @@ class DatabaseConnector:
 
 
   def mark_experiment_as_finished(self, _id, too_expensive):
+    log.info(f'Marking experiment {_id} as finished (too_expensive={too_expensive})')
     self.experiments.update_one(
       {'_id': _id},
       {
