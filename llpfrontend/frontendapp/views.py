@@ -28,7 +28,7 @@ def index(request: HttpRequest):
   return render(request, "frontendapp/index.html", {})
 
 
-def comparisons(request: HttpRequest):
+def single_model_graphs_page(request: HttpRequest):
   models_list = conn.get_unique_model_ids_with_finished_evaluations()
 
   if len(models_list) == 0:
@@ -40,12 +40,12 @@ def comparisons(request: HttpRequest):
   
   context = {'general_data': {'models_list': models_list, 'selected_model': selected_model},
              'no_models': no_models}
-  return render(request, "frontendapp/comparisons.html", context)
+  return render(request, "frontendapp/single_model_graphs_page.html", context)
   #return HttpResponse("A?")
 
 
 # adds "all" and "none" to the filter options, adds fitlering by dates
-def get_filters_for_ui(filters_list: List[Dict], evaluations: List[Dict]) -> List[Dict]:
+def get_config_filters_for_ui(filters_list: List[Dict], evaluations: List[Dict]) -> List[Dict]:
   filters_list = copy.deepcopy(filters_list)
   for filter_dict in filters_list:
     filter_dict['values'].extend(['all', 'none'])
@@ -75,7 +75,11 @@ def get_filters_for_ui(filters_list: List[Dict], evaluations: List[Dict]) -> Lis
           ]
         },
 """
-def get_task_ratings_for_ui_from_computed_data(computed_df: pd.DataFrame) -> List[Dict]:
+def get_task_metrics_for_ui_from_computed_data(computed_df: pd.DataFrame) -> List[Dict]:
+  """computed_df columns: model_id, task_type, metric_name, value
+  """
+  print('sdfsdf'*20)
+  print(computed_df)
   final_list = []
 
   # will need another function for multiple models
@@ -103,7 +107,7 @@ def convert_to_numeric_if_possible(value: Any) -> Union[float, Any]:
     return value
 
 
-def just_task_rating_data(request: HttpRequest):
+def get_metrics_data_for_one_model(request: HttpRequest):
   log.info('\n'*4)
   model_id = request.GET.get('single_model_id', None)
   model_evaluations = conn.get_finished_evaluations_for_model(model_id)
@@ -129,10 +133,10 @@ def just_task_rating_data(request: HttpRequest):
     all_possible_parameters,
     filters_in_request,
     date_filter=date_filter)
-  task_ratings = get_task_ratings_for_ui_from_computed_data(computed_eval_data)
+  task_ratings = get_task_metrics_for_ui_from_computed_data(computed_eval_data)
 
   data = {
-    'filters': get_filters_for_ui(all_possible_parameters, model_evaluations),
+    'filters': get_config_filters_for_ui(all_possible_parameters, model_evaluations),
     'evaluation_error_message': 'There were errors in model evaluation' if False else '',
     'task_ratings': task_ratings
   }

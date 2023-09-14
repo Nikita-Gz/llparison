@@ -193,6 +193,8 @@ def get_unique_config_params_in_evaluations(evaluations: list) -> List[Dict]:
 Example cols in df: model_id, task_type, parameter_1, parameter_2, metric_name, value
 """
 def create_evaluations_df(evaluations: list, all_possible_parameters: List[Dict], filter_values: Dict[str, Any], date_filter: str) -> pd.DataFrame:
+  """Returns a DF with following columns: model_id, task_type, metric_name, value
+  """
   unique_params = [parameter['name'] for parameter in all_possible_parameters]
 
   # todo: ugh rework it to use pandas pivot table or smth
