@@ -101,10 +101,10 @@ class ModelRunner:
       max_tokens_after_generation = len(tokenized_payload) + max_new_tokens
       exceeded_context_size_by = max(max_tokens_after_generation - self.model.context_size, 0)
       if exceeded_context_size_by > 0:
-        # todo: report this
         # todo: cull tokens in a batch
         log.warning(f'Cutting down payload by {exceeded_context_size_by} tokens')
         payload = tokenizer.decode(tokenized_payload[:self.model.context_size - max_new_tokens])
+        callback.increment_counter_in_notes('Culled prompts count')
       
       # todo: if payload is already tokenized once to check it's length, try passing the tokens instead of text
       generated_text = model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']

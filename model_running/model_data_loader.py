@@ -221,7 +221,7 @@ class DatabaseConnector:
       'model_id': model._id,
       'iterations': 1,
       'config': config.to_dict(),
-      'notes': '',
+      'notes': {},
       'task_type': task_type,
       'metrics': {},
       'outputs': []
@@ -292,8 +292,34 @@ class DatabaseConnector:
     self.experiments.update_one(
       {'_id': experiment_id},
       {'$set': {'metrics': metrics}})
+  
+
+  def increment_counter_in_notes(
+      self,
+      experiment_id: str,
+      notes_key: str):
+    """Increments a value in the notes by 1. Sets the value to 1 if it does not exist yet
+    This can be used for counting specific error occurences"""
+    # todo: remake it to use only one DB request ;_;
+
+    existing_notes = self.experiments.find_one(
+      {'_id': experiment_id},
+      {'notes': 1})['notes']
+    
+    # fixes previous version of notes to use dict instead of string
+    if isinstance(existing_notes, str):
+      log.warning(f'Clearing existing string notes for experiment {experiment_id} to use dict instead')
+      existing_notes = {}
+    
+    existing_notes[notes_key] = existing_notes.get(notes_key, 0) + 1
+
+    self.experiments.update_one(
+      {'_id': experiment_id},
+      {'$set': {'notes': existing_notes}})
 
 
+  # unused in recent code
+  """
   def save_run(self, model: RunnableModel, task_type: int, iterations: int, config: Config, experiment_result: TaskOutput, experiment_date: str):
     # todo: redo to use saving of several runs in one experiment
     experiment_dict = {
@@ -304,7 +330,7 @@ class DatabaseConnector:
       'model_id': model._id,
       'iterations': iterations,
       'config': config.to_dict(),
-      'notes': '',
+      'notes': {},
       'task_type': task_type,
       'metrics': experiment_result.metrics,
       'outputs': []
@@ -319,6 +345,7 @@ class DatabaseConnector:
         'interpreted_output': interpreted_output,
         'input_code': input_code})
     self.experiments.insert_one(experiment_dict)
+  """
 
 
   # saves new model if it is not tracked yet, adds one tracking entry if it is

@@ -142,3 +142,14 @@ class EvaluationResultsCallback:
     if self.db_connection is not None:
       self._cache_or_write_output_to_db(processed_output)
 
+  
+  def increment_counter_in_notes(
+      self,
+      notes_key: str):
+    """Increments a value in the notes by 1. Sets the value to 1 if it does not exist yet
+    This can be used for counting specific error occurences"""
+    if self.db_connection is not None:
+      log.info(f'Incrementing notes key "{notes_key}"')
+      self.db_connection.increment_counter_in_notes(self.experiment_id, notes_key)
+    else:
+      log.error(f'Tried incrementing notes key "{notes_key}", but no DB is attached')
