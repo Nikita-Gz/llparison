@@ -41,6 +41,27 @@ db = DatabaseConnector(
             'discount': 0.0
           }
         ]
+      },
+      {
+        '_id': 'hf::gpt2',
+        'owner': '',
+        'name': 'gpt2',
+        'source': 'hf',
+        'first_tracked_on': str(datetime.datetime.now()),
+        'last_tracked_on': str(datetime.datetime.now()),
+        'tracking_history': [
+          {
+            'date': str(datetime.datetime.now()),
+            'hf_inference_api_supported': False,
+            'available': True,
+            'context_size': 1024,
+            'price_prompt': 0,
+            'price_completion': 0,
+            'prompt_limit': 1000,
+            'max_tokens_limit': 1000,
+            'discount': 0.0
+          }
+        ]
       }
     ]
   }
