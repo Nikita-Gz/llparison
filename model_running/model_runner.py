@@ -63,23 +63,29 @@ class ModelRunner:
       return -1
 
 
-  def run_hf_local(self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
+  def run_hf_local(
+      self,
+      payloads: Dict[str, str],
+      callback: EvaluationResultsCallback,
+      max_new_tokens: int = 3):
     log.info(f'Running model {self.model._id} locally as HF model')
 
     #device_code = self._get_device_code()
     #log.info(f'Running on device #{device_code}')
 
+    tokenizer = AutoTokenizer.from_pretrained(self._hf_model_name)
     model_pipeline = pipeline(
       "text-generation",
       model=self._hf_model_name,
       device_map='auto',
+      tokenizer=tokenizer,
       torch_dtype=torch.float16)
 
     parameters_to_get_and_defaults = {
       'temperature': 0.01,
       'top_p': 0.9,
       'top_k': 1,
-      'max_new_tokens': 3,
+      'max_new_tokens': max_new_tokens,
       'return_full_text': False,
       'do_sample': True,
     }
@@ -90,6 +96,17 @@ class ModelRunner:
 
     iteration = 0
     for input_code, payload in payloads.items():
+      # culls the payload if necessary
+      tokenized_payload = tokenizer.encode(payload)
+      max_tokens_after_generation = len(tokenized_payload) + max_new_tokens
+      exceeded_context_size_by = max(max_tokens_after_generation - self.model.context_size, 0)
+      if exceeded_context_size_by > 0:
+        # todo: report this
+        # todo: cull tokens in a batch
+        log.warning(f'Cutting down payload by {exceeded_context_size_by} tokens')
+        payload = tokenizer.decode(tokenized_payload[:self.model.context_size - max_new_tokens])
+      
+      # todo: if payload is already tokenized once to check it's length, try passing the tokens instead of text
       generated_text = model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
       callback.record_output(generated_text, input_code=input_code)
       if iteration % 1 == 0:
