@@ -121,6 +121,7 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
       [
         {
           graph_name: str,
+          score_label: str,
           values:
           [
             {
@@ -140,7 +141,7 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
 
   def create_metrics_graph_data_dict(metrics: Dict[str, float]) -> Dict[str, Union[str, Dict]]:
     log.info(f'Creating metric graph')
-    data_dict = {'graph_name': 'Metrics', 'values': []}
+    data_dict = {'graph_name': 'Metrics', 'score_label': 'Metric Score', 'values': []}
     data_values = data_dict['values'] # type: list
     for metric_name, metric_value in metrics.items():
       data_values.append({'name': metric_name, 'value': metric_value})
@@ -149,7 +150,7 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
 
   def create_RC_answer_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
     log.info(f'Creating RC answer distrigution graph')
-    data_dict = {'graph_name': 'Answer Distribution', 'values': []}
+    data_dict = {'graph_name': 'Answer Distribution', 'score_label': 'Answer Count', 'values': []}
     data_values_list = data_dict['values'] # type: list
 
     interpreted_answer_counter = Counter()
@@ -186,6 +187,22 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
   return final_data_list
 
 
+def _create_notes_list_from_experiments(model_experiments: List[Dict]) -> List[str]:
+  """Currently this just sums up "Culled prompts count" notes"""
+  final_notes_list = []
+  total_culled_prompts = 0
+  for experiment in model_experiments:
+    notes = experiment['notes'] # type: Dict[str, int]
+    if not isinstance(notes, dict):
+      log.info(f'Skipping notes for experiment {experiment["_id"]} as they are not in dict format ({type(notes)})')
+      continue
+    culled_prompts_in_experiment = notes.get('Culled prompts count', 0)
+    log.info(f'Read {culled_prompts_in_experiment} culled prompt count in experiment {experiment["_id"]}')
+    total_culled_prompts += culled_prompts_in_experiment
+  final_notes_list.append(f'Culled prompts count: {total_culled_prompts}')
+  return final_notes_list
+
+
 def get_graphs_data_for_one_model(request: HttpRequest):
   log.info('\n'*4)
   model_id = request.GET.get('single_model_id', None)
@@ -218,6 +235,7 @@ def get_graphs_data_for_one_model(request: HttpRequest):
 
   data = {
     'filters': get_config_filters_for_ui(all_possible_parameters, model_evaluations),
+    'notes': _create_notes_list_from_experiments(filtered_model_experiments),
     'evaluation_error_message': 'There were errors in model evaluation' if False else '',
     'tasks_graphs_data': tasks_graphs_data
   }

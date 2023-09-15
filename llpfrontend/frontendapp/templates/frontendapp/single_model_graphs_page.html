@@ -4,14 +4,14 @@
 <script>
 
 // charts
-function make_barchart(element_id, labels_list, data_list) {
+function make_barchart(element_id, labels_list, data_list, graph_label) {
     var ctx = document.getElementById(element_id).getContext('2d');
     var myChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels_list,
             datasets: [{
-                label: 'Score',
+                label: graph_label,
                 data: data_list,
                 borderWidth: 1,
                 backgroundColor: palette('tol', labels_list.length).map(function(hex) {
@@ -90,6 +90,13 @@ function create_charts(response) {
             var chart_div = document.createElement('div')
             charts_container.appendChild(chart_div)
 
+            var chart_label_b = document.createElement('b')
+            chart_div.appendChild(chart_label_b)
+            var chart_label_center = document.createElement('center')
+            chart_label_b.appendChild(chart_label_center)
+            var chart_label = document.createElement('label')
+            chart_label.textContent = graph_name
+            chart_label_center.appendChild(chart_label)
             var el = document.createElement('canvas')
             chart_id = task_name + "_" + graph_name + "_chart"
             el.setAttribute('id', chart_id);
@@ -97,7 +104,7 @@ function create_charts(response) {
             el.setAttribute('height', 100);
             chart_div.appendChild(el)
 
-            make_barchart(chart_id, names_list, values_list)
+            make_barchart(chart_id, names_list, values_list, graph_data['score_label'])
         })
     })
 
@@ -163,6 +170,20 @@ function create_filters(response) {
     })
 }
 
+
+function create_notes(response) {
+    var notes_list = response["notes"]
+    notes_div = document.getElementById('notes_div')
+    notes_div.textContent = ""
+
+    notes_list.forEach((note_text) => {
+        var note_label = document.createElement('label')
+        note_label.textContent = note_text
+        notes_div.appendChild(note_label)
+    })
+}
+
+
 function apply_filters() {
     filters_data = {}
     filters_array.forEach((filterNode) => {
@@ -178,6 +199,7 @@ function apply_filters() {
         data: filters_data,
         success: function(response) {
             create_charts(response)
+            create_notes(response)
         },
         error: function(xhr) {
             alert(xhr)
@@ -205,6 +227,7 @@ function update_selected_model_highlighter() {
 function process_single_model_data_response(response) {
     create_charts(response)
     create_filters(response)
+    create_notes(response)
     // create_charts
 }
 
@@ -284,5 +307,7 @@ $(document).ready(update_selected_model_highlighter)
         </div>
     {% endfor %}
 -->
+</div>
+<div id='notes_div'>
 </div>
 {%endblock content%}
