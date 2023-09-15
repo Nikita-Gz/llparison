@@ -25,7 +25,9 @@ log = logging.getLogger("views.py")
 logging.basicConfig(level=logging.DEBUG)
 
 
-conn = DatabaseConnector()
+conn = DatabaseConnector(
+  fill_with_testing_stuff=False,
+  path_to_preload_data='./db_dump')
 
 def index(request: HttpRequest):
   return render(request, "frontendapp/index.html", {})
@@ -157,10 +159,15 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
     for experiment in experiments:
       all_interpreted_answers_in_experiment = [output['interpreted_output'] for output in experiment['outputs']]
       interpreted_answer_counter.update(all_interpreted_answers_in_experiment)
-    log.info(f'Got the following counts: {interpreted_answer_counter}')
+      log.info(f'Got the following counts: {interpreted_answer_counter}')
 
     for interpreted_value_name, occurence_count in dict(interpreted_answer_counter).items():
+      if interpreted_value_name is None:
+        interpreted_value_name = '-'
       data_values_list.append({'name': interpreted_value_name, 'value': occurence_count})
+
+    log.info(f'Got the following counts: {data_values_list}')
+    data_dict['values'] = sorted(data_values_list, key=lambda answer_count: answer_count['name'])
     
     return data_dict
 

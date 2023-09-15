@@ -14,7 +14,8 @@ function make_barchart(element_id, labels_list, data_list, graph_label) {
                 label: graph_label,
                 data: data_list,
                 borderWidth: 1,
-                backgroundColor: palette('tol', labels_list.length).map(function(hex) {
+                // todo: use a propper palette generator
+                backgroundColor: palette('tol', 5).map(function(hex) {
                     return '#' + hex;
                 })
             }]

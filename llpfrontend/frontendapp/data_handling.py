@@ -7,6 +7,7 @@ from os import environ
 from typing import *
 import mongomock
 import logging
+import pickle
 
 from .fake_run_data import get_fake_testing_evaluations
 
@@ -30,7 +31,9 @@ _load_raw_reading_comprehension_data()
 class DatabaseConnector:
   columns_list = ['first_tracked_on', 'last_tracked_on', 'available', 'original_name', 'owner', 'name', 'price_prompt', 'ff_inference_api_supported', 'source', 'price_completion', 'context', 'prompt_limit', 'max_tokens_limit']
 
-  def __init__(self) -> None:
+  def __init__(self,
+               fill_with_testing_stuff: bool,
+               path_to_preload_data: Union[str, None]=None) -> None:
     # use a mock DB if the app is not on k8s
 
     running_on_k8s = environ.get('K8S_DEPLOYMENT') is not None
@@ -44,8 +47,24 @@ class DatabaseConnector:
     self.models = self.db['models']
     self.experiments = self.db['experiments']
 
-    if not running_on_k8s:
+    if fill_with_testing_stuff:
       self._fill_with_testing_stuff()
+    
+    if path_to_preload_data is not None:
+      self.load_data_from_path(path_to_preload_data)
+
+
+  def load_data_from_path(self, path: str):
+    log.info(f'Loading data from path {path}')
+    with open(path, 'rb') as file:
+      data = pickle.load(file) # type: Dict[str, List[Dict]]
+
+    for collection, items in data.items():
+      log.info(f'Inserting {len(items)} default items in {collection}')
+      try:
+        self.db[collection].insert_many(items)
+      except Exception as e:
+        log.warn(f'Got a data write error: \n' + str(e))
 
 
   def _get_fake_testing_evaluations(self):
