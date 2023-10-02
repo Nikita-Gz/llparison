@@ -139,7 +139,6 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
   Reading Comprehension task will add a graph with interpreted answers distribution
   """
   log.info(f'Creating graphs for the model')
-  
 
   def create_metrics_graph_data_dict(metrics: Dict[str, float]) -> Dict[str, Union[str, Dict]]:
     log.info(f'Creating metric graph')
@@ -149,16 +148,21 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
       data_values.append({'name': metric_name, 'value': metric_value})
     return data_dict
   
-
   def create_RC_answer_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
     log.info(f'Creating RC answer distrigution graph')
-    data_dict = {'graph_name': 'Answer Distribution', 'score_label': 'Answer Count', 'values': []}
-    data_values_list = data_dict['values'] # type: list
+    final_data_dict = {'graph_name': 'Answer Distribution', 'score_label': 'Answer Count', 'values': []}
+    data_values_list = final_data_dict['values'] # type: list
 
     interpreted_answer_counter = Counter()
     for experiment in experiments:
-      all_interpreted_answers_in_experiment = [output['interpreted_output'] for output in experiment['outputs']]
-      interpreted_answer_counter.update(all_interpreted_answers_in_experiment)
+      interpreted_answers_in_experiment = [output['interpreted_output'] for output in experiment['outputs']]
+
+      # Changes answers that aren't A/B/C/D into "Others"
+      corrected_interpreted_answers = [
+        answer if answer in ['A', 'B', 'C', 'D'] else 'Other'
+        for answer in interpreted_answers_in_experiment]
+
+      interpreted_answer_counter.update(corrected_interpreted_answers)
       log.info(f'Got the following counts: {interpreted_answer_counter}')
 
     for interpreted_value_name, occurence_count in dict(interpreted_answer_counter).items():
@@ -167,9 +171,9 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
       data_values_list.append({'name': interpreted_value_name, 'value': occurence_count})
 
     log.info(f'Got the following counts: {data_values_list}')
-    data_dict['values'] = sorted(data_values_list, key=lambda answer_count: answer_count['name'])
+    final_data_dict['values'] = sorted(data_values_list, key=lambda answer_count: answer_count['name'])
     
-    return data_dict
+    return final_data_dict
 
 
   # fills it up by tasks
