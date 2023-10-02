@@ -276,17 +276,19 @@ $(document).ready(update_selected_model_highlighter)
 {% if no_models%}
 <label>No models available for comparison!</label>
 {% endif %}
+<label>Select a model to inspect:</label>
 <ul>
     {% for model_name in general_data.models_list %}
         <li id="{{model_name}}_list_item">{{model_name}}</li>
     {%endfor%}
 </ul>
-<br/>
 <label id='selected_model_label'>Selected model: {{general_data.selected_model}}</label>
+<br/>
 <br/>
 </div>
 
 <div>
+<label>Filter out experiments by configuration:</label>
 <div id='filters_div'>
 </div>
 {% if not no_models%}
