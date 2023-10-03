@@ -20,7 +20,7 @@ from task_output import TaskOutput
 from task_type import TaskType, task_type_int_to_str
 from cost_callback import CostCallback
 from eval_results_callback import EvaluationResultsCallback
-from prompt_constructor import PromptConstructor
+from prompt_constructor import PromptConstructor, UniversalTokenizer
 
 # todo: !! custom tasks must be saved to db and loaded from it
 
@@ -48,15 +48,16 @@ class Task:
     rc_questions = dataset['questions']
     return rc_texts, rc_questions
 
-
-  # loads RACE data as prompts, excluding a set of IDs.
-  # Returns it as a dict of {question_id: prompt}
+  
   def _prepare_reading_comprehension_prompts(
       self,
       rc_texts: Dict[str, str],
       rc_questions: Dict[str, Dict],
       excluded_question_ids: set,
-      configuration: Config) -> Dict:
+      configuration: Config,
+      model: RunnableModel) -> Tuple[Dict, int, int]:
+    """Loads RACE data as prompts, excluding a set of IDs.
+      Returns the dataset as a dict of {question_id: prompt}, and the number of cut prompts"""
     log.info('Preparing RC prompts')
 
     # prepared_prompts will have the following format:
@@ -69,18 +70,27 @@ class Task:
       task_type_str=task_type_int_to_str[self.type],
       configuration_dict=configuration.to_dict())
 
+    tokenizer = UniversalTokenizer(model)
+    total_token_count = 0
+    total_prompts_cut = 0
     for question_id, question_dict in rc_questions.items():
       if question_id in excluded_question_ids:
         excluded_count += 1
         continue
       question_context_text = rc_texts[question_dict['text_id']]
-      prompt = prompt_constructor.construct_prompt(
-        text=question_context_text,
-        question_dict=question_dict)
+      prompt, token_count, cut_by_n_tokens = prompt_constructor.construct_prompt(
+        context_text=question_context_text,
+        question_dict=question_dict,
+        model=model,
+        task_type=self.type,
+        tokenizer=tokenizer)
       prepared_prompts[question_id] = prompt
-    log.info(f'Loaded {len(prepared_prompts)} questions ({excluded_count} were excluded)')
+      total_token_count += token_count
+      if cut_by_n_tokens > 0:
+        total_prompts_cut += 1
+    log.info(f'Loaded {len(prepared_prompts)} questions, ({excluded_count} were excluded, {total_prompts_cut} were cut)')
     
-    return prepared_prompts
+    return prepared_prompts, total_token_count, total_prompts_cut
 
 
   def _get_reading_comprehension_answer_id_from_model_output(self, model_output: str) -> Union[int, None]:
@@ -224,14 +234,12 @@ class Task:
     return (model, config)
   
 
-  def _compute_prompts_cost(self, prompts: List[str], model_runner: ModelRunner) -> float:
-    true_price = model_runner.model.get_price_with_discount()
+  def _compute_prompts_cost(self, token_count: int, model: RunnableModel) -> float:
+    true_price = model.get_price_with_discount()
     log.info(f'Model\'s true price is {true_price}')
     if true_price == 0:
       total_cost = 0
     else:
-      token_count = model_runner.count_tokens(prompts)
-      log.info(f'Total token count is {token_count}')
       total_cost = true_price * token_count
 
     log.info(f'Total token cost is {total_cost}')
@@ -277,27 +285,28 @@ class Task:
     model, config = combination_for_evaluation
     
     rc_texts, rc_questions = self._load_raw_reading_comprehension_data()
-    prompts_dict = self._prepare_reading_comprehension_prompts(
+    prompts_dict, total_token_count, total_cut_prompts = self._prepare_reading_comprehension_prompts(
       rc_texts, rc_questions,
       excluded_question_ids=set([output['input_code'] for output in already_completed_outputs]),
-      configuration=config)
+      configuration=config,
+      model=model)
     runner = ModelRunner(model, config)
 
     # process the cost
     if cost_limit is not None:
-      total_cost = self._compute_prompts_cost(list(prompts_dict.values()), runner)
+      total_cost = self._compute_prompts_cost(total_token_count, model)
       if total_cost > cost_limit:
         log.error(f'Cost is too high, aborting experiment {experiment_id} and marking it as finished')
         db_connection.mark_experiment_as_finished(experiment_id, too_expensive=True)
         return
-      elif cost_callback is not None:
+      if cost_callback is not None:
         cost_callback.register_estimated_initial_cost(total_cost)
         log.info('Registering the cost with the callback')
       log.info('The cost is acceptable')
     else:
       log.info('Cost limit is none')
 
-    #_get_reading_comprehension_answer_id_from_model_output
+    # runs the models
     evaluation_callback = EvaluationResultsCallback(
       db_connection=db_connection,
       experiment_id=experiment_id,
