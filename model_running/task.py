@@ -57,7 +57,7 @@ class Task:
       configuration: Config,
       model: RunnableModel) -> Tuple[Dict, int, int]:
     """Loads RACE data as prompts, excluding a set of IDs.
-      Returns the dataset as a dict of {question_id: prompt}, and the number of cut prompts"""
+      Returns the dataset as a dict of {question_id: prompt}, total token count, and the number of cut prompts"""
     log.info('Preparing RC prompts')
 
     # prepared_prompts will have the following format:
