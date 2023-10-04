@@ -7,6 +7,7 @@ import tiktoken
 from typing import *
 from transformers import AutoTokenizer
 
+from run_config import Config
 from task_type import TaskType, new_tokens_limit_per_task_type
 from runnable_model_data import RunnableModel
 
@@ -40,14 +41,45 @@ class UniversalTokenizer:
       tokenizer = tiktoken.get_encoding('cl100k_base')
     
     self._tokenizer = tokenizer
-  
+    self._cached_encodings = {}
+
+
+  def _get_cached_encoding(self, text: Union[str, List[str]]) -> Union[List[int], List[List[int]], None]:
+    """Returns already saved cached encoding, returns None if it wasnt cached"""
+
+    # converts the list to tuple to allow dict lookup
+    if isinstance(text, list):
+      text = tuple(text)
+    
+    return self._cached_encodings.get(text, None)
+
+
+  def _save_cached_encoding(self, text: Union[str, List[str]], encoding: Union[List[int], List[List[int]]]) -> None:
+    """Saves cached encoding"""
+
+    # converts the encoding to tuple to allow dict lookup
+    if isinstance(text, list):
+      text = tuple(text)
+    
+    self._cached_encodings[text] = encoding
+
+
   def encode(self, text: Union[str, List[str]]) -> Union[List[int], List[List[int]]]:
+    """If the input wasn't cached, encodes the text and caches it for reuse"""
+
+    cached_encoding = self._get_cached_encoding(text)
+    if cached_encoding is not None:
+      return cached_encoding
+
     if isinstance(text, str):
-      return self._tokenizer.encode(text)
+      encoded_result = self._tokenizer.encode(text)
     elif isinstance(text, list):
-      return self._tokenizer.encode_batch(text) # type: ignore
+      encoded_result = self._tokenizer.encode_batch(text) # type: ignore
     else:
       raise TypeError(f'Not supported text type ({type(text)})')
+    
+    self._save_cached_encoding(text, encoded_result)
+    return encoded_result
   
 
   def decode(
@@ -65,10 +97,11 @@ def _construct_default_reading_comprehension_prompt(
     question_dict: dict,
     model: RunnableModel,
     task_type: TaskType,
-    tokenizer: UniversalTokenizer) -> Tuple[str, int, int]:
+    tokenizer: UniversalTokenizer,
+    **kwargs) -> Tuple[str, int, int]:
   """Creates a default RC prompt, matching for the model
   
-  Returns the prompt, and the number of tokens it was cut by"""
+  Returns the prompt, token count, and the number of tokens it was cut by"""
 
   question_text = question_dict['question']
   options_text = ''
@@ -101,8 +134,53 @@ def _construct_default_reading_comprehension_prompt(
   return final_text, max_tokens_after_generation, exceeded_context_size_by
 
 
-def _construct_default_bot_detection_prompt(text: str, question_dict: dict) -> Tuple[str, int, int]:
-  pass
+def _construct_default_bot_detection_prompt(
+    post_history: List[str],
+    model: RunnableModel,
+    task_type: TaskType,
+    tokenizer: UniversalTokenizer,
+    **kwargs) -> Tuple[str, int, int]:
+  """Creates a default bot detection prompt, matching for the model
+  
+  Returns the prompt, token count, and the number of posts it was cut by"""
+
+  header_text = """You are a helpful bot detection program. You will read the posts made by a user, and determine if they were made by a bot (Y/N). Here is the example:
+Post: Airline employee steals plane from Seattle airport, crashes and dies - CNN: CNN Airline employee steals plane from Seattle airport, crashes and dies CNN (CNN) An airline employee stole an otherwise unoccupied passenger plane Friday from the\u2026 https://t.co/2FbjpYYuUH https://t.co/gtvQKqz4YG
+Was this written by a bot?: "Y"
+Post: Late night video editing. Finishing it up pre' soon. Hopefully I'll be able to put it up on YouTube in… http://t.co/9OtxogubwQ
+Was this written by a bot?: "N"
+Post: It's highly unlikely, but I'd love if @andy_murray beat Djokovic here. As soon as he's back Murray should take a medical time out!
+Was this written by a bot?: "N"
+Post: Children at Play, ca. 1895-1897 https://t.co/P9Mpn4TNYS https://t.co/MJR7laIwcM
+Was this written by a bot?: "Y"
+Here is the user's post history:
+"""
+  suffix_text = 'Were these posts made by a bot?: "'
+  encoded_necessary_text = tokenizer.encode([header_text, suffix_text])
+  necessary_text_token_count = sum([len(tokens) for tokens in encoded_necessary_text]) + new_tokens_limit_per_task_type[task_type]
+  max_allowed_tokens_for_posts = model.context_size - necessary_text_token_count
+
+  '''
+  Posts text should look like this:
+  Post 1) some text some text some text
+  Post 2) some text some text some text
+  '''
+  posts_current_token_count = 0
+  posts_to_add = []
+  for i, post in enumerate(post_history):
+    post_text_to_add = f'Post {i+1}) {post}\n###\n'
+    post_token_size = len(tokenizer.encode(post_text_to_add))
+    posts_new_token_count = posts_current_token_count + post_token_size
+    if posts_new_token_count < max_allowed_tokens_for_posts:
+      posts_to_add.append(post_text_to_add)
+      posts_current_token_count = posts_new_token_count
+  total_posts_text = ''.join(posts_to_add)
+
+  final_text = ''.join([header_text, total_posts_text, suffix_text])
+  total_token_count = necessary_text_token_count + posts_current_token_count
+  cut_posts = len(post_history) - len(posts_to_add)
+
+  return final_text, total_token_count, cut_posts
 
 
 PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor functions
@@ -110,7 +188,8 @@ PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor func
     'default': _construct_default_reading_comprehension_prompt
   },
   'Bot Detection': {
-    'default': _construct_default_bot_detection_prompt
+    'default': _construct_default_bot_detection_prompt,
+    'without examples': _construct_default_bot_detection_prompt
   }
 }
 
@@ -123,7 +202,8 @@ class PromptConstructor:
       task_type_str: str,
       configuration_dict: dict) -> None:
     # task type is a string, as the class is supposed to work without TaskType object
-    self.constructor_function = self._get_prompt_constructor_function(task_type_str, configuration_dict) # type: Callable
+    self.configuration_dict = configuration_dict
+    self.constructor_function = self._get_prompt_constructor_function(task_type_str) # type: Callable
 
 
   def construct_prompt(self, /, model: RunnableModel, task_type: TaskType, tokenizer: UniversalTokenizer, **kwargs) -> Tuple[str, int, int]:
@@ -136,17 +216,23 @@ class PromptConstructor:
     - Reading comprehension:
     - - context_text: str
     - - question_dict: dict
+    - Bot Detection:
+    - - post_history: List[str]
 
     Returns the prompt text, token count, as well as the number of tokens it was cut by
     """
-    return self.constructor_function(model=model, task_type=task_type, tokenizer=tokenizer, **kwargs)
+    return self.constructor_function(
+      model=model,
+      task_type=task_type,
+      tokenizer=tokenizer,
+      config=self.configuration_dict,
+      **kwargs)
   
   
   def _get_prompt_constructor_function(
       self,
-      task_type_str: str,
-      configuration_dict: dict) -> Callable[..., Tuple[str, int, int]]:
-    prompt_type = configuration_dict.get('prompt_type', 'default')
+      task_type_str: str) -> Callable[..., Tuple[str, int, int]]:
+    prompt_type = self.configuration_dict.get('prompt_type', 'default')
     log.info(f'Finding the prompt constructor function for prompt type {prompt_type} and task {task_type_str}')
 
     prompt_constructors_for_task = PROMPT_CONSTRUCTORS_MAP.get(task_type_str, None) # type: Union[dict, None]

@@ -2,6 +2,7 @@ import string
 import re
 import logging
 import pickle
+from collections import Counter
 from typing import *
 
 from model_data_loader import DatabaseConnector
@@ -20,7 +21,7 @@ class EvaluationResultsCallback:
                experiment_id: str,
                task: TaskType,
                existing_processed_outputs=None,
-               validation_data=None,
+               validation_data: Union[None, Dict]=None,
                db_enabled=True,
                db_cache_limit=500,
                path_to_save_db_on_update: Union[str, None]=None,
@@ -49,8 +50,66 @@ class EvaluationResultsCallback:
     log.info(f'Computing metrics for reading comprehension')
     processed_output_values = self.processed_outputs.values()
     accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
+
+    answer_counts = list(Counter([output['interpreted_output'] for output in processed_output_values]).values())
+    max_count = max(answer_counts)
+    min_counts = min(answer_counts)
+    answer_count_difference = max_count - min_counts
+
+    answer_disproportion = 1 - (answer_count_difference / len(processed_output_values))
+
+    unfit_answers = sum([output['interpreted_output'] is None for output in processed_output_values]) / len(processed_output_values)
     metrics = {
-      'accuracy': accuracy
+      'accuracy': accuracy,
+      'answer_disproportion': answer_disproportion,
+      'unfit_answers': unfit_answers
+    }
+    log.info(f'Metrics: {metrics}')
+    return metrics
+  
+
+  def _compute_bot_detection_metrics(self):
+    log.info(f'Computing metrics for bot detection')
+    processed_output_values = self.processed_outputs.values()
+
+    accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
+
+    # counts true positives, false negatives, false positives
+    true_positives = 0
+    false_negatives = 0
+    false_positives = 0
+    false_negatives = 0
+    unfit_answers = 0
+    for input_code, output in self.processed_outputs.items():
+      correct_answer = self.test_data[input_code]
+      model_answer = output['interpreted_output']
+
+      if model_answer is None:
+        unfit_answers += 1
+        continue
+
+      if correct_answer: # captures true positives and false negatives
+        if model_answer: # captures true positive
+          true_positives += 1
+        else: # captures false negative
+          false_negatives += 1
+      else: # captures false positives and false negatives
+        if model_answer: # captures false positive
+          false_positives += 1
+        else: # captures false negative
+          false_negatives += 1
+        
+    recall = true_positives / (true_positives + false_negatives)
+    precision = true_positives / (true_positives + false_positives)
+    f1 = 2 * (precision * recall) / (precision + recall)
+    accuracy = (true_positives + false_negatives) / len(self.processed_outputs)
+    unfit_answers_portion = unfit_answers / len(self.processed_outputs)
+    metrics = {
+      'recall': recall,
+      'precision': precision,
+      'f1': f1,
+      'accuracy': accuracy,
+      'unfit_answers': unfit_answers_portion
     }
     log.info(f'Metrics: {metrics}')
     return metrics
@@ -98,6 +157,8 @@ class EvaluationResultsCallback:
     # go through all processed outputs. Flushes DB cache beforehand
     if self.task == TaskType.READING_COMPREHENSION:
       metrics = self._compute_reading_comprehension_metrics()
+    elif self.task == TaskType.BOT_DETECTION:
+      metrics = self._compute_bot_detection_metrics()
     else:
       raise NotImplementedError(f'Metrics for task {self.task} are NYI')
     
@@ -105,25 +166,53 @@ class EvaluationResultsCallback:
     self._dump_db_if_applicable()
 
 
-  def _get_reading_comprehension_answer_id_from_model_output(self, model_output: str) -> Union[int, None]:
-    assert model_output is not None, "Model output is none"
-
-    matches = re.findall(r'[a-zA-Z]', model_output)
-    if len(matches) == 0:
-      return None
-    first_letter = matches[0].upper()
-    return self.alphabet2idx.get(first_letter, None)
-
-
-  # ranks the raw output and creates a dict that will go into the DB
   def _process_reading_comprehension_raw_output(self, raw_output: str, input_code: str) -> dict:
-    model_answer_id = self._get_reading_comprehension_answer_id_from_model_output(raw_output)
-    correct_answer_letter = self.test_data[input_code]['answer']
+    """Processes the raw model output into an interpreted output format applicable for the RC task"""
+
+    def get_reading_comprehension_answer_id_from_model_output(model_output: str) -> Union[int, None]:
+      """The first letter of the output will be counted as the answer the model chose"""
+      assert model_output is not None, "Model output is none"
+      matches = re.findall(r'[a-zA-Z]', model_output) # type: List[str]
+      if len(matches) == 0:
+        return None
+      first_letter = matches[0].upper()
+      return EvaluationResultsCallback.alphabet2idx.get(first_letter, None)
+
+    model_answer_id = get_reading_comprehension_answer_id_from_model_output(raw_output)
+    correct_answer_letter = self.test_data[input_code]
     correct_answer_id = self.alphabet2idx[correct_answer_letter]
     model_answer_letter = self.idx2alphabet.get(model_answer_id, None)
     correct = model_answer_id is not None and model_answer_id == correct_answer_id
     processed_output = {
       'interpreted_output': model_answer_letter,
+      'model_output': raw_output,
+      'input_code': input_code,
+      'correct': correct
+    }
+    return processed_output
+  
+
+  def _process_bot_detection_raw_output(self, raw_output: str, input_code: str) -> dict:
+    """Processes the raw model output into an interpreted output format applicable for the bot detection task"""
+
+    def get_bot_detection_answer_from_model_output(model_output: str) -> Union[bool, None]:
+      """Returns True if the first letter appearing in the model output is "Y", False if "N", None in other case"""
+      assert model_output is not None, "Model output is none"
+      matches = re.findall(r'[yYnN]', model_output) # type: List[str]
+      if len(matches) == 0:
+        return None
+      first_letter = matches[0].lower()
+      return first_letter == 'y'
+
+    interpreted_model_answer = get_bot_detection_answer_from_model_output(raw_output)
+    correct_answer = self.test_data[input_code]
+    if interpreted_model_answer is not None:
+      correct = interpreted_model_answer == correct_answer
+    else:
+      correct = False
+    processed_output = {
+      'interpreted_output': interpreted_model_answer,
+      #'expected_answer': correct_answer,
       'model_output': raw_output,
       'input_code': input_code,
       'correct': correct
@@ -136,6 +225,8 @@ class EvaluationResultsCallback:
     if self.task == TaskType.READING_COMPREHENSION:
       processed_output = self._process_reading_comprehension_raw_output(model_raw_output, input_code)
       self.processed_outputs[input_code] = processed_output
+    elif self.task == TaskType.BOT_DETECTION:
+      processed_output = self._process_bot_detection_raw_output(model_raw_output, input_code)
     else:
       raise NotImplementedError(f'Task {self.task} is NYI')
     

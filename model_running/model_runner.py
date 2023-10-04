@@ -150,7 +150,7 @@ class ModelRunner:
 
   # payloads - dict of {input_key: prompt}
   def run_model(
-      self, payloads: Dict[str, str], callback: EvaluationResultsCallback):
+      self, payloads: Dict[str, str], callback: EvaluationResultsCallback, max_new_tokens: int):
     # give a warning if the prompt is > context size
     log.info(f'Running model {self.model._id}')
     
@@ -161,7 +161,7 @@ class ModelRunner:
     elif self.model.source == 'hf' and self.model.hf_inferable:
       asyncio.run(self.run_hf_inference_payload(payloads, callback))
     elif self.model.source == 'hf' and not self.model.hf_inferable:
-      self.run_hf_local(payloads, callback)
+      self.run_hf_local(payloads, callback, max_new_tokens=max_new_tokens)
     else:
       raise NotImplementedError(f"Running from source {self.model_source} is NYI")
 
