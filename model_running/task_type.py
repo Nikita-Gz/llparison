@@ -18,6 +18,6 @@ new_tokens_limit_per_task_type = {
   TaskType.READING_COMPREHENSION: 3,
   #TaskType.SPAM_CLASSIFICATION: 'Spam Classification',
   #TaskType.CUSTOM: 'Custom',
-  TaskType.BOT_DETECTION: 3
+  TaskType.BOT_DETECTION: 1
 }
 
