@@ -58,7 +58,7 @@ class EvaluationResultsCallback:
 
     answer_disproportion = 1 - (answer_count_difference / len(processed_output_values))
 
-    unfit_answers = sum([output['interpreted_output'] is None for output in processed_output_values]) / len(processed_output_values)
+    unfit_answers = sum([output['interpreted_output'] not in ['A', 'B', 'C', 'D'] for output in processed_output_values]) / len(processed_output_values)
     metrics = {
       'accuracy': accuracy,
       'answer_disproportion': answer_disproportion,
