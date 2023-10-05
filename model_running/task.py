@@ -461,7 +461,7 @@ class Task:
     
     # checks if all evaluations were completed, save metrics if so, complain and die if not
     log.info(f'Checking if all input codes were tested on')
-    all_input_codes = set(prompts_dict.keys())
+    all_input_codes = set(validation_data.keys())
     processed_input_codes = set([
       output['input_code'] for output in db_connection.get_experiment_from_id(experiment_id)['outputs']])
     if all_input_codes == processed_input_codes:
