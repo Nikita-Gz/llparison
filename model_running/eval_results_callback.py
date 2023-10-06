@@ -227,6 +227,7 @@ class EvaluationResultsCallback:
       self.processed_outputs[input_code] = processed_output
     elif self.task == TaskType.BOT_DETECTION:
       processed_output = self._process_bot_detection_raw_output(model_raw_output, input_code)
+      self.processed_outputs[input_code] = processed_output
     else:
       raise NotImplementedError(f'Task {self.task} is NYI')
     
