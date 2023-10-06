@@ -366,7 +366,7 @@ class Task:
       experiment_id, combination_for_evaluation = self._create_new_experiment(db_connection, date)
       if experiment_id is None:
         log.info(f'Stopping the task as there is no applicable experiment to create')
-        return
+        return None, None, None, None
     else:
       experiment_id = unfinished_experiment['_id']
       combination_for_evaluation = self._recover_unfinished_experiment_llm_config_combination(
@@ -427,6 +427,8 @@ class Task:
     experiment_id, model, config, already_completed_outputs = self.recover_or_create_experiment(
       db_connection=db_connection,
       date=date)
+    if experiment_id is None:
+      return
     
     prompts_dict, total_token_count, total_cut_prompts, validation_data = self._load_and_prepare_prompts_for_task(
       excluded_input_ids=set([output['input_code'] for output in already_completed_outputs]),
