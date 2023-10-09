@@ -186,7 +186,7 @@ class DatabaseConnector:
     })
 
     models_to_return = []
-    for model_obj in db_models:
+    for model_obj in list(db_models): # had to make this one a list because otherwise Mongomock is non-deterministic, sometimes iterating and sometimes don't...
       models_to_return.append(RunnableModel(
         _id=model_obj['_id'],
         owner=model_obj['owner'],

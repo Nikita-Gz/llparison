@@ -84,7 +84,7 @@ function create_charts(response) {
             names_list = []
             values_list = []
             graph_values.forEach((graph_value) => {
-                names_list.push(task_name + ": " + graph_value["name"])
+                names_list.push(graph_value["name"] + ": " + graph_value["value"].toFixed(2))
                 values_list.push(graph_value["value"])
             })
 

@@ -73,12 +73,11 @@ class ModelRunner:
     #device_code = self._get_device_code()
     #log.info(f'Running on device #{device_code}')
 
-    tokenizer = AutoTokenizer.from_pretrained(self._hf_model_name)
     model_pipeline = pipeline(
       "text-generation",
       model=self._hf_model_name,
       device_map='auto',
-      tokenizer=tokenizer,
+      tokenizer=AutoTokenizer.from_pretrained(self._hf_model_name),
       torch_dtype=torch.float16)
 
     parameters_to_get_and_defaults = {
@@ -96,17 +95,6 @@ class ModelRunner:
 
     iteration = 0
     for input_code, payload in payloads.items():
-      # culls the payload if necessary
-      tokenized_payload = tokenizer.encode(payload)
-      max_tokens_after_generation = len(tokenized_payload) + max_new_tokens
-      exceeded_context_size_by = max(max_tokens_after_generation - self.model.context_size, 0)
-      if exceeded_context_size_by > 0:
-        # todo: cull tokens in a batch
-        log.warning(f'Cutting down payload by {exceeded_context_size_by} tokens')
-        payload = tokenizer.decode(tokenized_payload[:self.model.context_size - max_new_tokens])
-        callback.increment_counter_in_notes('Culled prompts count')
-      
-      # todo: if payload is already tokenized once to check it's length, try passing the tokens instead of text
       generated_text = model_pipeline(text_inputs=payload, **final_parameters)[0]['generated_text']
       callback.record_output(generated_text, input_code=input_code)
       if iteration % 1 == 0:
@@ -162,17 +150,9 @@ class ModelRunner:
 
   # payloads - dict of {input_key: prompt}
   def run_model(
-      self, payloads: Dict[str, str], callback: EvaluationResultsCallback,
-      count_tokens=False):
+      self, payloads: Dict[str, str], callback: EvaluationResultsCallback, max_new_tokens: int):
     # give a warning if the prompt is > context size
     log.info(f'Running model {self.model._id}')
-
-    if count_tokens:
-      log.info(f'Counting tokens')
-      payload_size = self.count_tokens(list(payloads.values()))
-      log.info(f'{payload_size} tokens')
-    #if payload_size > self.model.context_size:
-    #  log.warning(f'Payload size ({payload_size}) > max context size ({self.model.context_size})')
     
     if self.model.name == 'rc_test_model':
       self._run_rc_test_function(payloads, callback)
@@ -181,7 +161,7 @@ class ModelRunner:
     elif self.model.source == 'hf' and self.model.hf_inferable:
       asyncio.run(self.run_hf_inference_payload(payloads, callback))
     elif self.model.source == 'hf' and not self.model.hf_inferable:
-      self.run_hf_local(payloads, callback)
+      self.run_hf_local(payloads, callback, max_new_tokens=max_new_tokens)
     else:
       raise NotImplementedError(f"Running from source {self.model_source} is NYI")
 
@@ -230,26 +210,3 @@ class ModelRunner:
         hf_tasks.append(self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, input_code, callback, session))
       asyncio.gather(hf_tasks)
 
-
-  def count_tokens(self, payloads: Union[str, List[str]]) -> int:
-    log.info(f'Counting tokens')
-    # todo: make it supprot different encodings depending on the model
-
-    if self.model.source == 'hf':
-      log.info(f'Using HF tokenizer for {self._hf_model_name}')
-      tokenizer = AutoTokenizer.from_pretrained(self._hf_model_name)
-      tokenizer.encode_batch = lambda texts: [tokenizer.encode(text) for text in texts]
-    else:
-      DEFAULT_TOKENIZER = 'cl100k_base'
-      log.info(f'Using default tokenizer: {DEFAULT_TOKENIZER}')
-      tokenizer = tiktoken.get_encoding('cl100k_base')
-
-    token_count = 0
-    if isinstance(payloads, str):
-      token_count += len(tokenizer.encode(payloads))
-    elif isinstance(payloads, list):
-      token_count += sum([len(count) for count in tokenizer.encode_batch(payloads)])
-    else:
-      raise TypeError(f'Payload has unsupported type of {type(payloads)}')
-    
-    return token_count
