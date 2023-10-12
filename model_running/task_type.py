@@ -2,22 +2,18 @@ from enum import Enum
 
 class TaskType(Enum):
   READING_COMPREHENSION = 1
-  #SPAM_CLASSIFICATION = 2
   BOT_DETECTION = 4
-  #CUSTOM = 3
-  #READING_COMPREHENSION_TEST = 4
+
 task_type_int_to_str = {
   TaskType.READING_COMPREHENSION: 'Reading Comprehension',
-  #TaskType.SPAM_CLASSIFICATION: 'Spam Classification',
-  #TaskType.CUSTOM: 'Custom',
   TaskType.BOT_DETECTION: 'Bot Detection'
-  #TaskType.READING_COMPREHENSION_TEST: 'Reading Comprehension Test'
 }
+task_type_str_to_int = {s:i for i, s in task_type_int_to_str.items()}
 
-new_tokens_limit_per_task_type = {
+new_tokens_limit_per_task_type_int = {
   TaskType.READING_COMPREHENSION: 3,
-  #TaskType.SPAM_CLASSIFICATION: 'Spam Classification',
-  #TaskType.CUSTOM: 'Custom',
   TaskType.BOT_DETECTION: 1
 }
+
+new_tokens_limit_per_task_type_str = {s:new_tokens_limit_per_task_type_int[i] for i, s in task_type_int_to_str.items()}
 

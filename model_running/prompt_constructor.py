@@ -8,7 +8,7 @@ from typing import *
 from transformers import AutoTokenizer
 
 from run_config import Config
-from task_type import TaskType, new_tokens_limit_per_task_type
+from task_type import TaskType, new_tokens_limit_per_task_type_int, task_type_int_to_str
 from runnable_model_data import RunnableModel
 
 log = logging.getLogger(os.path.basename(__file__))
@@ -122,7 +122,7 @@ def _construct_default_reading_comprehension_prompt(
   assert necessary_text_token_count < model.context_size, f'Necessary text ({necessary_text_token_count}) is larger than model context ({model.context_size})'
 
   tokenized_context = tokenizer.encode(context_text)
-  max_tokens_after_generation = necessary_text_token_count + len(tokenized_context) + new_tokens_limit_per_task_type[task_type]
+  max_tokens_after_generation = necessary_text_token_count + len(tokenized_context) + new_tokens_limit_per_task_type_int[task_type]
   exceeded_context_size_by = max(max_tokens_after_generation - model.context_size, 0)
   if exceeded_context_size_by > 0:
     log.warning(f'Cutting down RC text by {exceeded_context_size_by + 1} tokens (1 extra to add a "..." to the end)')
@@ -157,7 +157,7 @@ Here is the user's post history:
 """
   suffix_text = 'Were these posts made by a bot?: "'
   encoded_necessary_text = tokenizer.encode([header_text, suffix_text])
-  necessary_text_token_count = sum([len(tokens) for tokens in encoded_necessary_text]) + new_tokens_limit_per_task_type[task_type]
+  necessary_text_token_count = sum([len(tokens) for tokens in encoded_necessary_text]) + new_tokens_limit_per_task_type_int[task_type]
   max_allowed_tokens_for_posts = model.context_size - necessary_text_token_count
 
   '''
@@ -184,10 +184,10 @@ Here is the user's post history:
 
 
 PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor functions
-  'Reading Comprehension': {
+  TaskType.READING_COMPREHENSION: {
     'default': _construct_default_reading_comprehension_prompt
   },
-  'Bot Detection': {
+  TaskType.BOT_DETECTION: {
     'default': _construct_default_bot_detection_prompt,
     'without examples': _construct_default_bot_detection_prompt
   }
@@ -199,17 +199,16 @@ class PromptConstructor:
   """
   def __init__(
       self,
-      task_type_str: str,
+      task_type: TaskType,
       configuration_dict: dict) -> None:
-    # task type is a string, as the class is supposed to work without TaskType object
+    self.task_type = task_type
     self.configuration_dict = configuration_dict
-    self.constructor_function = self._get_prompt_constructor_function(task_type_str) # type: Callable
+    self.constructor_function = self._get_prompt_constructor_function() # type: Callable
 
 
-  def construct_prompt(self, /, model: RunnableModel, task_type: TaskType, tokenizer: UniversalTokenizer, **kwargs) -> Tuple[str, int, int]:
+  def construct_prompt(self, /, model: RunnableModel, tokenizer: UniversalTokenizer, **kwargs) -> Tuple[str, int, int]:
     """Required arguments:
     - tokenizer: UniversalTokenizer
-    - task_type: TaskType
     - model: RunnableModel
     
     Kwargs guide per task type:
@@ -223,25 +222,23 @@ class PromptConstructor:
     """
     return self.constructor_function(
       model=model,
-      task_type=task_type,
+      task_type=self.task_type,
       tokenizer=tokenizer,
       config=self.configuration_dict,
       **kwargs)
   
   
-  def _get_prompt_constructor_function(
-      self,
-      task_type_str: str) -> Callable[..., Tuple[str, int, int]]:
+  def _get_prompt_constructor_function(self) -> Callable[..., Tuple[str, int, int]]:
     prompt_type = self.configuration_dict.get('prompt_type', 'default')
-    log.info(f'Finding the prompt constructor function for prompt type {prompt_type} and task {task_type_str}')
+    log.info(f'Finding the prompt constructor function for prompt type {prompt_type} and task {self.task_type}')
 
-    prompt_constructors_for_task = PROMPT_CONSTRUCTORS_MAP.get(task_type_str, None) # type: Union[dict, None]
+    prompt_constructors_for_task = PROMPT_CONSTRUCTORS_MAP.get(self.task_type, None) # type: Union[dict, None]
     if prompt_constructors_for_task is None:
-      raise AttributeError(f'Could not find prompt constructors for task {task_type_str}')
+      raise AttributeError(f'Could not find prompt constructors for task {self.task_type}')
 
     prompt_constructor_for_task_and_prompt_type = prompt_constructors_for_task.get(prompt_type, None) # type: Union[Callable, None]
     if prompt_constructor_for_task_and_prompt_type is None:
-      raise AttributeError(f'Could not find prompt constructor for task {task_type_str} and prompt type {prompt_type}')
+      raise AttributeError(f'Could not find prompt constructor for task {self.task_type} and prompt type {prompt_type}')
     
     log.info(f'Found prompt constructor named {prompt_constructor_for_task_and_prompt_type.__name__}')
 
