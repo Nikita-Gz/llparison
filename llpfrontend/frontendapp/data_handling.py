@@ -9,6 +9,7 @@ import mongomock
 import logging
 import pickle
 
+from .runnable_model_data import RunnableModel
 from .fake_run_data import get_fake_testing_evaluations
 
 log = logging.getLogger("data_handling.py")
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 RC_TEXTS = None # type: Dict[str, str]
 RC_QUESTIONS = None # type: Dict[str, Dict]
 
-def _load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
+def _load_raw_reading_comprehension_data():
   global RC_TEXTS
   global RC_QUESTIONS
   log.info('Loading RC dataset')
@@ -26,6 +27,38 @@ def _load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
   RC_TEXTS = dataset['texts']
   RC_QUESTIONS = dataset['questions']
 _load_raw_reading_comprehension_data()
+
+
+BOT_DETECTION_DATASET = None # type: Dict[str, Tuple[bool, List[str]]]
+def _load_bot_detection_data():
+  """Fills BOT_DETECTION_DATASET with data of the following format:
+
+  {
+    input_code:
+    (
+      bool, # true if the post is made by a bot
+
+      [str, ...] # post history
+    )
+  }
+
+  Input code is represented by user ID
+  """
+
+  log.info('Loading bot detection dataset')
+  with open("./bot_or_not.json", 'r') as file:
+    dataset = json.load(file)
+  
+  # keeps only necessary data, transform into the required format
+  dataset = {
+    dataset_entry['user_id']: (
+      True if dataset_entry['human_or_bot'] == 'bot' else False,
+      dataset_entry['post_history'] # type: List[str]
+    )
+    for dataset_entry in dataset
+  }
+  return dataset
+BOT_DETECTION_DATASET = _load_bot_detection_data()
 
 
 class DatabaseConnector:
@@ -82,13 +115,13 @@ class DatabaseConnector:
     return list(unique_tasks)
 
 
-  def get_evaluations_for_llm_config_task_combination(self, task_type: str, combination: Dict):
+  def get_evaluations_for_llm_config_task_combination(self, task_type: str, model: RunnableModel, config: Dict):
     experiments_matching_model = list(self.experiments.find({
       'task_type': task_type,
       'finished': True,
       'too_expensive': False,
-      'model_id': combination['model_id']}))
-    config_to_look_for = combination['config']
+      'model_id': model._id}))
+    config_to_look_for = config
     experiments_matching_models_and_configs = [
       experiment for experiment in experiments_matching_model
       if experiment['config'] == config_to_look_for
@@ -132,6 +165,23 @@ class DatabaseConnector:
       'too_expensive': False
       })
     return list(evaluations)
+  
+
+  def model_ids_to_runnable_models(self, model_ids: List[str]) -> List[RunnableModel]:
+    returned_models = self.models.find({'_id':{'$in':model_ids}})
+    runnable_models = []
+    for returned_model in returned_models:
+      runnable_models.append(
+        RunnableModel(
+          _id=returned_model['_id'],
+          owner=returned_model['owner'],
+          name=returned_model['name'],
+          source=returned_model['source'],
+          context_size=returned_model['tracking_history'][-1]['context_size'],
+          hf_inferable=returned_model['tracking_history'][-1]['hf_inference_api_supported'],
+          available=returned_model['tracking_history'][-1]['available'],
+          price=max(returned_model['tracking_history'][-1]['price_completion'], returned_model['tracking_history'][-1]['price_prompt'])))
+    return runnable_models
 
 
 def get_unique_input_codes_from_evaluations(evaluations: List[Dict]) -> List[str]:
