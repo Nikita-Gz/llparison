@@ -1,0 +1,28 @@
+<div>
+  <div id="task_details">
+    <labe>User's post history (user ID = {{input_code}}): </label>
+    <ul>
+    {% for post in post_history %}
+      <li>{{post}}</li>
+    {% endfor %}
+    </ul>
+    <labe>Is the user a bot?: {{is_bot}}</label>
+    <br/>
+  </div>
+  <b>Specific model results:</b>
+  <div id="results_per_model">
+    {% for readable_name, prompt_and_counts in prompt_and_interpreted_output_counts_per_readable_llm_config_combination.items %}
+      {% if prompt_and_counts.counts|length > 0 %}
+        <label>Iterpreted outputs for model {{readable_name}}:</label>
+        <pre>Prompt:<p>:{{prompt_and_counts.prompt}}</p></pre>
+        <ul>
+        {% for answer, count in prompt_and_counts.counts.items %}
+          <li>Answer "{{answer}}" - answered {{count}} times</li>
+        {% endfor %}
+        </ul>
+      {% else %}
+        <label>There are no outputs for model {{readable_name}}</label>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>

@@ -286,8 +286,7 @@ def _get_prompt_for_model_config_combination(
       ).construct_prompt(
         tokenizer=tokenizer,
         model=model,
-        context_text=kwargs['context_text'],
-        question_dict=kwargs['question_dict'])[0]
+        **kwargs)[0]
   except Exception as e:
     log.error(f'Exception when constructing prompt: {e}')
     prompt = 'No prompt available for this combination'
@@ -302,6 +301,9 @@ def _get_task_specific_dataset_entry_for_input_code(task_type_str: str, input_co
   if task_type_int == TaskType.READING_COMPREHENSION:
     question_entry = RC_QUESTIONS[input_code]
     return {'question_dict': question_entry, 'context_text': RC_TEXTS[question_entry['text_id']]}
+  elif task_type_int == TaskType.BOT_DETECTION:
+    _, post_history = BOT_DETECTION_DATASET[input_code]
+    return {'post_history': post_history}
   else:
     raise Exception(f'Unknown task type "{task_type_str}"')
 
@@ -340,19 +342,26 @@ def _get_task_specific_context(input_code:str, task_type_str: str, llm_configs: 
   context = {
     'input_code': input_code
   }
-  if task_type_str_to_int[task_type_str] == TaskType.READING_COMPREHENSION:
+  task_type_as_enum = task_type_str_to_int[task_type_str]
+  if task_type_as_enum == TaskType.READING_COMPREHENSION:
     question_details = RC_QUESTIONS[input_code]
     context['question_context'] = RC_TEXTS[question_details['text_id']]
     context['question'] = question_details['question']
     context['options'] = [f'{idx2alphabet.get(i)}) {option}' for i, option in enumerate(question_details['options'])]
     context['answer'] = question_details['answer']
-    context['prompt_and_interpreted_output_counts_per_readable_llm_config_combination'] = (
-      _get_prompts_and_answer_counts_for_llm_config_combinations_for_dataset_entry(
-        input_code=input_code,
-        task_type_str=task_type_str,
-        llm_configs=llm_configs))
+  elif task_type_as_enum == TaskType.BOT_DETECTION:
+    question_details = BOT_DETECTION_DATASET[input_code]
+    is_bot, post_history = question_details
+    context['post_history'] = post_history
+    context['is_bot'] = is_bot
   else:
     raise Exception(f'Unknown task type "{task_type_str}"')
+  
+  context['prompt_and_interpreted_output_counts_per_readable_llm_config_combination'] = (
+    _get_prompts_and_answer_counts_for_llm_config_combinations_for_dataset_entry(
+      input_code=input_code,
+      task_type_str=task_type_str,
+      llm_configs=llm_configs))
   return context
 
 
@@ -368,7 +377,8 @@ def _draw_single_test_results(request) -> HttpResponse:
     llm_configs=llm_configs)
 
   appropriate_render_template = {
-    TaskType.READING_COMPREHENSION: 'frontendapp/rc_results_ui.html'
+    TaskType.READING_COMPREHENSION: 'frontendapp/rc_results_ui.html',
+    TaskType.BOT_DETECTION: 'frontendapp/bd_results_ui.html'
   }[task_type_str_to_int[task_type_str]]
 
   return render(request, appropriate_render_template, context)
