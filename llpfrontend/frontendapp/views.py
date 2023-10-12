@@ -8,9 +8,11 @@ from .data_handling import (
   filter_experiments_by_filters,
   aggregate_metrics_from_experiments,
   prettify_config_dict,
-  RC_QUESTIONS, RC_TEXTS
+  RC_QUESTIONS, RC_TEXTS, BOT_DETECTION_DATASET
 )
-from .prompt_constructor import PromptConstructor
+from .prompt_constructor import PromptConstructor, UniversalTokenizer
+from .task_type import task_type_str_to_int, TaskType
+from .runnable_model_data import RunnableModel
 
 import random
 from typing import *
@@ -28,6 +30,9 @@ logging.basicConfig(level=logging.DEBUG)
 conn = DatabaseConnector(
   fill_with_testing_stuff=False,
   path_to_preload_data='./db_dump')
+
+# this will hold requested universal tokenizers for each model ID
+tokenizers = {} # type: Dict[str, UniversalTokenizer]
 
 def index(request: HttpRequest):
   return render(request, "frontendapp/index.html", {})
@@ -266,64 +271,117 @@ def task_results_ui(request: HttpRequest):
   return render(request, "frontendapp/task_results.html", context)
 
 
-idx2alphabet = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
-def _draw_rc_results(request) -> HttpResponse:
-  input_code = request.GET.get('input_code', None)
-  task_type = request.GET.get('task_type', None)
-  log.info(f'Drawing results for input code {input_code} and task type {task_type}')
-  llm_configs = json.loads(request.GET.get('llm_configs', None)) # type: List[Dict]
+def _get_prompt_for_model_config_combination(
+    task_type_str: str,
+    config: Dict,
+    model: RunnableModel,
+    **kwargs
+):
+  tokenizer = tokenizers.get(model._id, UniversalTokenizer(model))
+  tokenizers[model._id] = tokenizer
+  try:
+    prompt = PromptConstructor(
+      task_type=task_type_str_to_int[task_type_str],
+      configuration_dict=config
+      ).construct_prompt(
+        tokenizer=tokenizer,
+        model=model,
+        **kwargs)[0]
+  except Exception as e:
+    log.error(f'Exception when constructing prompt: {e}')
+    prompt = 'No prompt available for this combination'
+  return prompt
 
-  log.warning(f'Configs being tested: {llm_configs}')
 
-  question_details = RC_QUESTIONS[input_code]
-  question_context = RC_TEXTS[question_details['text_id']]
+def _get_task_specific_dataset_entry_for_input_code(task_type_str: str, input_code: str) -> Dict:
+  """
+  Returns an entry, which can be used in place of optional kwargs for prompt constructor's construct_prompt()
+  """
+  task_type_int = task_type_str_to_int[task_type_str]
+  if task_type_int == TaskType.READING_COMPREHENSION:
+    question_entry = RC_QUESTIONS[input_code]
+    return {'question_dict': question_entry, 'context_text': RC_TEXTS[question_entry['text_id']]}
+  elif task_type_int == TaskType.BOT_DETECTION:
+    _, post_history = BOT_DETECTION_DATASET[input_code]
+    return {'post_history': post_history}
+  else:
+    raise Exception(f'Unknown task type "{task_type_str}"')
 
-  # todo: rework prompts to be sent on-request
-  prompt_and_interpreted_output_counts_per_readable_llm_config_combination = dict()
-  for llm_config_combination in llm_configs:
-    log.info(f'Counting for combination {llm_config_combination}')
-    evals = conn.get_evaluations_for_llm_config_task_combination(task_type, llm_config_combination)
+
+def _get_prompts_and_answer_counts_for_llm_config_combinations_for_dataset_entry(
+    input_code: str,
+    task_type_str: str,
+    llm_configs: List[Dict]) -> Dict[str, Dict[str, Union[str, Dict]]]:
+  model_id_to_runnable_models = {
+    model._id:model for model in conn.model_ids_to_runnable_models([combo['model_id'] for combo in llm_configs])}
+  prompt_and_output_counts_per_llm_config_combination = dict()
+  for combination in llm_configs:
+    model_id, config = combination['model_id'], combination['config']
+    runnable_model = model_id_to_runnable_models[model_id]
+    log.info(f'Counting for combination {model_id, config}')
+    evals = conn.get_evaluations_for_llm_config_task_combination(task_type_str, runnable_model, config)
     log.info(f'Got {len(evals)} evaluations')
     interpreted_output_counts_for_model = count_interpreted_answers_for_input_code(evals, input_code)
     log.info(f'Counts: {interpreted_output_counts_for_model}')
-    readable_combination_name = llm_config_combination['model_id'] + ' : ' + prettify_config_dict(llm_config_combination['config'])
-    prompt_and_interpreted_output_counts_per_readable_llm_config_combination[readable_combination_name] = {
-      'prompt': PromptConstructor(task_type, llm_config_combination['config']).construct_prompt(text=question_context, question_dict=question_details),
-      'counts':interpreted_output_counts_for_model
+    readable_combination_name = model_id + ' : ' + prettify_config_dict(config)
+
+    tokenizer = tokenizers.get(model_id, UniversalTokenizer(runnable_model))
+    tokenizers[model_id] = tokenizer
+    task_specific_prompt_kwargs = _get_task_specific_dataset_entry_for_input_code(task_type_str, input_code)
+    prompt_and_output_counts_per_llm_config_combination[readable_combination_name] = {
+      'prompt': _get_prompt_for_model_config_combination(
+        task_type_str, config, runnable_model,
+        **task_specific_prompt_kwargs),
+      'counts': interpreted_output_counts_for_model
     }
+  return prompt_and_output_counts_per_llm_config_combination
 
-  question_details = RC_QUESTIONS[input_code]
+
+idx2alphabet = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
+def _get_task_specific_context(input_code:str, task_type_str: str, llm_configs: List[Dict]) -> Dict:
   context = {
-    'question_context': question_context,
-    'input_code': input_code,
-    'question': question_details['question'],
-    'options': [f'{idx2alphabet.get(i)}) {option}' for i, option in enumerate(question_details['options'])],
-    'answer': question_details['answer'],
-    'prompt_and_interpreted_output_counts_per_readable_llm_config_combination': prompt_and_interpreted_output_counts_per_readable_llm_config_combination
+    'input_code': input_code
   }
-  print(context)
-  return render(request, "frontendapp/rc_results_ui.html", context)
+  task_type_as_enum = task_type_str_to_int[task_type_str]
+  if task_type_as_enum == TaskType.READING_COMPREHENSION:
+    question_details = RC_QUESTIONS[input_code]
+    context['question_context'] = RC_TEXTS[question_details['text_id']]
+    context['question'] = question_details['question']
+    context['options'] = [f'{idx2alphabet.get(i)}) {option}' for i, option in enumerate(question_details['options'])]
+    context['answer'] = question_details['answer']
+  elif task_type_as_enum == TaskType.BOT_DETECTION:
+    question_details = BOT_DETECTION_DATASET[input_code]
+    is_bot, post_history = question_details
+    context['post_history'] = post_history
+    context['is_bot'] = is_bot
+  else:
+    raise Exception(f'Unknown task type "{task_type_str}"')
+  
+  context['prompt_and_interpreted_output_counts_per_readable_llm_config_combination'] = (
+    _get_prompts_and_answer_counts_for_llm_config_combinations_for_dataset_entry(
+      input_code=input_code,
+      task_type_str=task_type_str,
+      llm_configs=llm_configs))
+  return context
 
 
-def _draw_results(request) -> HttpResponse:
-  task_type = request.GET.get('task_type', None)
-  function_selector_by_task = {
-    'Reading Comprehension': _draw_rc_results
-  }
-  return function_selector_by_task[task_type](request)
+def _draw_single_test_results(request) -> HttpResponse:
+  input_code = request.GET.get('input_code', None) # type: str
+  task_type_str = request.GET.get('task_type', None) # type: str
+  llm_configs = json.loads(request.GET.get('llm_configs', None)) # type: List[Dict]
+  log.info(f'Drawing results for input code {input_code} and task type {task_type_str}')
 
+  context = _get_task_specific_context(
+    input_code=input_code,
+    task_type_str=task_type_str,
+    llm_configs=llm_configs)
 
-def _draw_rc_prompt(request: HttpRequest) -> HttpResponse:
-  input_code = request.GET.get('input_code', None)
-  task_type = request.GET.get('task_type', None)
+  appropriate_render_template = {
+    TaskType.READING_COMPREHENSION: 'frontendapp/rc_results_ui.html',
+    TaskType.BOT_DETECTION: 'frontendapp/bd_results_ui.html'
+  }[task_type_str_to_int[task_type_str]]
 
-
-def _draw_prompt_text_window(request: HttpRequest) -> HttpResponse:
-  task_type = request.GET.get('task_type', None)
-  function_selector_by_task = {
-    'Reading Comprehension': _draw_rc_prompt
-  }
-  return function_selector_by_task[task_type](request)
+  return render(request, appropriate_render_template, context)
 
 
 def task_results_data(request: HttpRequest):
@@ -345,7 +403,7 @@ def task_results_data(request: HttpRequest):
     input_codes = get_unique_input_codes_from_evaluations(evaluations)
     final_data['input_codes'] = input_codes
   elif requested_data_type == 'evaluation_graphic':
-    return _draw_results(request)
+    return _draw_single_test_results(request)
   elif requested_data_type == 'prompt_text':
     #task_type = request.GET.get('task_type', None)
     pass

@@ -71,14 +71,13 @@ class EvaluationResultsCallback:
   def _compute_bot_detection_metrics(self):
     log.info(f'Computing metrics for bot detection')
     processed_output_values = self.processed_outputs.values()
-
     accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
 
     # counts true positives, false negatives, false positives
     true_positives = 0
     false_negatives = 0
     false_positives = 0
-    false_negatives = 0
+    true_negatives = 0
     unfit_answers = 0
     for input_code, output in self.processed_outputs.items():
       correct_answer = self.test_data[input_code]
@@ -93,16 +92,15 @@ class EvaluationResultsCallback:
           true_positives += 1
         else: # captures false negative
           false_negatives += 1
-      else: # captures false positives and false negatives
+      else: # captures false positives and true negatives
         if model_answer: # captures false positive
           false_positives += 1
-        else: # captures false negative
-          false_negatives += 1
+        else: # captures true negative
+          true_negatives += 1
         
     recall = true_positives / (true_positives + false_negatives)
     precision = true_positives / (true_positives + false_positives)
     f1 = 2 * (precision * recall) / (precision + recall)
-    accuracy = (true_positives + false_negatives) / len(self.processed_outputs)
     unfit_answers_portion = unfit_answers / len(self.processed_outputs)
     metrics = {
       'recall': recall,

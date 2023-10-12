@@ -192,11 +192,11 @@ class DatabaseConnector:
         owner=model_obj['owner'],
         name=model_obj['name'],
         source=model_obj['source'],
-        context_size=model_obj['tracking_history'][0]['context_size'],
-        hf_inferable=model_obj['tracking_history'][0]['hf_inference_api_supported'],
-        available=model_obj['tracking_history'][0]['available'],
-        price=max(model_obj['tracking_history'][0]['price_completion'], model_obj['tracking_history'][0]['price_prompt']),
-        discount=model_obj['tracking_history'][0].get('discount', 0.0)))
+        context_size=model_obj['tracking_history'][-1]['context_size'],
+        hf_inferable=model_obj['tracking_history'][-1]['hf_inference_api_supported'],
+        available=model_obj['tracking_history'][-1]['available'],
+        price=max(model_obj['tracking_history'][-1]['price_completion'], model_obj['tracking_history'][-1]['price_prompt']),
+        discount=model_obj['tracking_history'][-1].get('discount', 0.0)))
     return models_to_return
   
 
@@ -268,11 +268,11 @@ class DatabaseConnector:
         owner=model_obj['owner'],
         name=model_obj['name'],
         source=model_obj['source'],
-        context_size=model_obj['tracking_history'][0]['context_size'],
-        hf_inferable=model_obj['tracking_history'][0]['hf_inference_api_supported'],
-        available=model_obj['tracking_history'][0]['available'],
-        price=max(model_obj['tracking_history'][0]['price_completion'], model_obj['tracking_history'][0]['price_prompt']),
-        discount=model_obj['tracking_history'][0].get('discount', 0.0))
+        context_size=model_obj['tracking_history'][-1]['context_size'],
+        hf_inferable=model_obj['tracking_history'][-1]['hf_inference_api_supported'],
+        available=model_obj['tracking_history'][-1]['available'],
+        price=max(model_obj['tracking_history'][-1]['price_completion'], model_obj['tracking_history'][-1]['price_prompt']),
+        discount=model_obj['tracking_history'][-1].get('discount', 0.0))
 
 
   def append_output_to_experiment(self, experiment_id, output):

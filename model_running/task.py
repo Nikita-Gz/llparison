@@ -17,7 +17,7 @@ from model_data_loader import DatabaseConnector
 from runnable_model_data import RunnableModel
 from run_config import Config
 from task_output import TaskOutput
-from task_type import TaskType, task_type_int_to_str, new_tokens_limit_per_task_type
+from task_type import TaskType, task_type_int_to_str, new_tokens_limit_per_task_type_int
 from cost_callback import CostCallback
 from eval_results_callback import EvaluationResultsCallback
 from prompt_constructor import PromptConstructor, UniversalTokenizer
@@ -97,7 +97,7 @@ class Task:
     prepared_prompts = dict()
     excluded_count = 0
     prompt_constructor = PromptConstructor(
-      task_type_str=task_type_int_to_str[self.type],
+      task_type=self.type,
       configuration_dict=configuration.to_dict())
 
     tokenizer = UniversalTokenizer(model)
@@ -112,7 +112,6 @@ class Task:
         context_text=question_context_text,
         question_dict=question_dict,
         model=model,
-        task_type=self.type,
         tokenizer=tokenizer)
       prepared_prompts[question_id] = prompt
       total_token_count += token_count
@@ -139,7 +138,7 @@ class Task:
     cut_posts_count = 0
     total_token_count = 0
     prompt_constructor = PromptConstructor(
-      task_type_str=task_type_int_to_str[self.type],
+      task_type=self.type,
       configuration_dict=configuration.to_dict())
     tokenizer = UniversalTokenizer(model)
     for i, (input_id, (_, posts)) in enumerate(bot_detection_dataset.items()):
@@ -149,7 +148,6 @@ class Task:
 
       prompt_text, token_count, posts_cut = prompt_constructor.construct_prompt(
         model=model,
-        task_type=self.type,
         tokenizer=tokenizer,
         post_history=posts)
       prepared_prompts[input_id] = prompt_text
@@ -235,20 +233,6 @@ class Task:
       log.info(f'Got {len(combinations_for_model)} combinations for model {model._id}')
       combinations.extend(combinations_for_model)
     return combinations
-    
-    '''
-    def get_combinations_for_rc_test():
-      combinations = [] # type: List[Tuple[RunnableModel, Config]]
-      for model in models_for_evaluating:
-        combinations.append((model, Config()))
-      log.info(f'Got {len(combinations)} combinations for RC testing model')
-      return combinations
-    '''
-
-    if self.type == TaskType.READING_COMPREHENSION:
-      return get_combinations_for_rc()
-    else:
-      raise NotImplemented(f'Unknown task type {self.type}')
 
 
   def _convert_date_to_datetime(self, date: Union[str, datetime.datetime]) -> datetime.datetime:
@@ -320,6 +304,7 @@ class Task:
       return None, None
 
     combination_for_evaluation = random.choice(combinations_up_for_evaluation)
+    log.info(f'Chosen combination {combination_for_evaluation}')
     experiment_id = db_connection.create_experiment_stump(
       model=combination_for_evaluation[0],
       task_type=task_type_int_to_str[self.type],
@@ -374,6 +359,7 @@ class Task:
         unfinished_experiment)
       already_completed_outputs = unfinished_experiment['outputs']
     model, config = combination_for_evaluation
+    log.info(f'Returning experiment {experiment_id}')
     return experiment_id, model, config, already_completed_outputs
 
 
@@ -455,7 +441,7 @@ class Task:
       runner.run_model(
         prompts_dict,
         callback=evaluation_callback,
-        max_new_tokens=new_tokens_limit_per_task_type[self.type])
+        max_new_tokens=new_tokens_limit_per_task_type_int[self.type])
       evaluation_callback.finalize_evaluation()
     except Exception as e:
       log.error(e)
