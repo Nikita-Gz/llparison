@@ -15,3 +15,6 @@ class RunnableModel:
     # discount = 0 -> no discount
     # discount = 1 -> free
     return self.price * (1 - self.discount)
+  
+  def __str__(self):
+    return str(self._id)
