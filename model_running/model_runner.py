@@ -80,18 +80,25 @@ class ModelRunner:
       tokenizer=AutoTokenizer.from_pretrained(self._hf_model_name),
       torch_dtype=torch.float16)
 
-    parameters_to_get_and_defaults = {
-      'temperature': 0.01,
-      'top_p': 0.9,
-      'top_k': 1,
-      'max_new_tokens': max_new_tokens,
-      'return_full_text': False,
-      'do_sample': True,
+    parameters_to_get_and_defaults_with_types = {
+      'temperature': (0.01, float),
+      'top_p': (0.9, float),
+      'top_k': (1, int),
+      'max_new_tokens': (max_new_tokens, int),
+      'return_full_text': (False, bool),
+      'do_sample': (True, bool),
     }
     final_parameters = dict()
 
-    for key, default_value in parameters_to_get_and_defaults.items():
-      final_parameters[key] = self.config.get_parameter(key, default=default_value)
+    # fills the model's parameters list with those from the saved config, converting type and using default if nevessary
+    for key, (default_value, expected_type) in parameters_to_get_and_defaults_with_types.items():
+      try:
+        parameter_value = self.config.get_parameter(key, default=default_value)
+        final_parameters[key] = expected_type(parameter_value)
+      except TypeError as e:
+        error_msg = f'Could not interpret type {type(parameter_value)} as {expected_type} for parameter {key} (got value {parameter_value})'
+        log.error(error_msg)
+        raise TypeError(error_msg)
 
     iteration = 0
     for input_code, payload in payloads.items():
