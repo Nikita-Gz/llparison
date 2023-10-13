@@ -1,4 +1,7 @@
 """
+Dirty copy of a model_runner.py from model_running module to ffacilitate quicker development.
+Todo: combine them all in a single module!
+
 This class will provide the means to run a variety of model types on the input data for different tasks.
 The class will chose the appropriate way to run the model (OAI API, OpenRouter, HF inference, local, etc)
 """
@@ -24,9 +27,9 @@ import torch
 from transformers import AutoTokenizer
 from transformers import pipeline
 
-from run_config import Config
-from runnable_model_data import RunnableModel
-from eval_results_callback import EvaluationResultsCallback
+from .run_config import Config
+from .runnable_model_data import RunnableModel
+from .eval_results_callback import EvaluationResultsCallback
 
 log = logging.getLogger(os.path.basename(__file__))
 logging.basicConfig(level=logging.INFO)
@@ -39,8 +42,6 @@ hf_headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
 
 
 # todo: account for different models needing inputs with "assistant"/"user" stuff
-
-
 class ModelRunner:
   def __init__(self, model: RunnableModel, config: Config) -> None:
     self.model = model
@@ -216,4 +217,23 @@ class ModelRunner:
         assert isinstance(payload, str), f'Unsupported payload element type: {type(payload)}'
         hf_tasks.append(self._query_hf_single({'inputs': payload, 'parameters': final_parameters}, input_code, callback, session))
       asyncio.gather(hf_tasks)
+
+
+
+class SimpleRunner:
+  """Allows for a quick one-time generation using ModelRunner, without the need to manage callbacks and everything else"""
+  def __init__(self, runner: ModelRunner) -> None:
+    class RecorderCallback:
+      def __init__(self) -> None:
+        self.output = None
+      
+      def record_output(self, output, **kwargs):
+        self.output = output
+    
+    self.callback = RecorderCallback()
+    self.runner = runner
+  
+  def run(self, prompt, token_limit: int) -> str:
+    self.runner.run_model({'_': prompt}, callback=self.callback, max_new_tokens=token_limit)
+    return self.callback.output
 
