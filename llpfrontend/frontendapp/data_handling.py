@@ -158,6 +158,11 @@ class DatabaseConnector:
     return list(unique_models)
   
 
+  def get_unique_model_ids(self) -> list:
+    unique_models = self.models.distinct('_id')
+    return list(unique_models)
+  
+
   def get_finished_evaluations_for_model(self, model_id) -> list:
     evaluations = self.experiments.find({
       'model_id': model_id,

@@ -412,3 +412,16 @@ def task_results_data(request: HttpRequest):
 
   return HttpResponse(json.dumps(final_data))
 
+
+def custom_inference_page(request: HttpRequest):
+  """This returns the custom inference page filled with task types and model ID's"""
+
+  task_options = conn.get_unique_task_types()
+  model_ids = conn.get_unique_model_ids()
+
+  context = {
+    'task_options': task_options,
+    'model_ids': model_ids
+  }
+  return render(request, 'frontendapp/custom_inference_page.html', context)
+
