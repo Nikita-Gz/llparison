@@ -425,3 +425,20 @@ def custom_inference_page(request: HttpRequest):
   }
   return render(request, 'frontendapp/custom_inference_page.html', context)
 
+
+def process_inference_request(request: HttpRequest):
+  """This runs the requested model with specified parameters, task type and task inputs"""
+
+  model_id = request.GET.get('model_id', None)
+  task_type = request.GET.get('task_type', None)
+  input_fields = json.loads(request.GET.get('input_fields', None))
+  config = json.loads(request.GET.get('config', None))
+  log.info(f"Received inference request")
+  log.info(f"model_id = {model_id}")
+  log.info(f"task_type = {task_type}")
+  log.info(f"input_fields = {input_fields}")
+  log.info(f"config = {config}")
+
+  inference_result = {'output': 'test_inference_output'}
+  return HttpResponse(json.dumps(inference_result))
+

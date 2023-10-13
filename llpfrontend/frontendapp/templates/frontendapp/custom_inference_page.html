@@ -100,14 +100,74 @@
       specific_field_holder.appendChild(input_field)
       fields_holder.appendChild(specific_field_holder)
     })
-
-    console.log(selected_fields)
   }
   $(document).ready(() => {
     task_selector = document.getElementById('task_selector')
     task_selector.addEventListener("change", create_fields_for_selected_task);
     create_fields_for_selected_task()
   })
+
+
+  function send_inference_request(model_id, model_results_label) {
+    var input_fields_dict = {}
+    task_specific_field_input_elements.forEach((input_field) => {
+      var field_name = input_field.name
+      var field_value = input_field.value
+      input_fields_dict[field_name] = field_value
+    })
+
+    var parameters_dict = {}
+    entered_parameters.forEach((parameter) => {
+      parameters_dict[parameter.name] = parameter.value
+    })
+
+    $.ajax({
+      url: "{% url 'inference_request' %}",
+      type: "GET",
+      dataType: "json",
+      data: {
+        model_id: model_id,
+        task_type: document.getElementById('task_selector').value,
+        input_fields: JSON.stringify(input_fields_dict),
+        config: JSON.stringify(parameters_dict)
+      },
+      success: function(response) {
+        model_results_label.textContent = "Model " + model_id + " inference result: " + response['output']
+      },
+      error: function(xhr) {
+        alert(xhr)
+      }
+    });
+  }
+
+
+  function infer() {
+    /*
+    1) get a list of models to infer on
+    2) create appropriate output fields with "Inference in progress..." text
+    3) send inference requests for each model
+    3.1) pack up the model and the parameters propperly before sending the request
+    3.2) display the inference result for each model as well as any error messages
+    */
+
+    var model_ids_to_infer = []
+    $("input:checkbox[name=model_checkbox]:checked").each(function(){
+      model_ids_to_infer.push($(this).attr("model_id"))
+      //model_ids_to_infer.push($(this).value);
+    });
+    
+    var inference_results_holder = document.getElementById('inference_results_section')
+    inference_results_holder.innerHTML = ''
+    model_ids_to_infer.forEach((model_id) => {
+      var model_results_holder = document.createElement('li')
+      var model_results_label = document.createElement('label')
+      model_results_label.textContent = "Model " + model_id + " inference result: Loading..."
+      send_inference_request(model_id, model_results_label)
+
+      model_results_holder.appendChild(model_results_label)
+      inference_results_holder.appendChild(model_results_holder)
+    })
+  }
 
 </script>
 {%endblock scripts%}
@@ -119,8 +179,7 @@
     <label>Select LLMs to infer with:</label>
     {% for model_id in model_ids %}
       <div>
-      <input type="checkbox" id="{{model_id}}_checkbox" name="{{model_id}}_checkbox"/>
-      <label for="{{model_id}}_checkbox">{{model_id}}</label>
+      <input type="checkbox" id="{{model_id}}_checkbox" name="model_checkbox" model_id="{{model_id}}">{{model_id}}</input>
       </div>
     {% endfor %}
   </div>
@@ -156,6 +215,12 @@
     <ol id="task_specific_fields">
     </ol>
   </div>
-  <button id="commence_inference_button">Infer</button>
+  <button id="commence_inference_button" onclick="infer();">Infer</button>
+  <div>
+    <h3>Inference results</h3>
+    <ol id="inference_results_section">
+    
+    </ol>
+  </div>
 </div>
 {%endblock content%}
