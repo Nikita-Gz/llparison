@@ -132,7 +132,7 @@
         config: JSON.stringify(parameters_dict)
       },
       success: function(response) {
-        model_results_label.textContent = "Model " + model_id + " inference result: " + response['output']
+        model_results_label.textContent = "Model " + model_id + " inference result: " + response['output'] + " (in " + response['microseconds'] + " microseconds)"
       },
       error: function(xhr) {
         alert(xhr)

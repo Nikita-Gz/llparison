@@ -11,8 +11,10 @@ from .data_handling import (
   RC_QUESTIONS, RC_TEXTS, BOT_DETECTION_DATASET
 )
 from .prompt_constructor import PromptConstructor, UniversalTokenizer
+from .run_config import Config
 from .task_type import task_type_str_to_int, TaskType
 from .runnable_model_data import RunnableModel
+from .inference_runner import InferenceRunner
 
 import random
 from typing import *
@@ -30,6 +32,7 @@ logging.basicConfig(level=logging.DEBUG)
 conn = DatabaseConnector(
   fill_with_testing_stuff=False,
   path_to_preload_data='./db_dump')
+inferer = InferenceRunner(conn)
 
 # this will hold requested universal tokenizers for each model ID
 tokenizers = {} # type: Dict[str, UniversalTokenizer]
@@ -430,15 +433,27 @@ def process_inference_request(request: HttpRequest):
   """This runs the requested model with specified parameters, task type and task inputs"""
 
   model_id = request.GET.get('model_id', None)
-  task_type = request.GET.get('task_type', None)
+  task_type_str = request.GET.get('task_type', None)
   input_fields = json.loads(request.GET.get('input_fields', None))
   config = json.loads(request.GET.get('config', None))
   log.info(f"Received inference request")
   log.info(f"model_id = {model_id}")
-  log.info(f"task_type = {task_type}")
+  log.info(f"task_type = {task_type_str}")
   log.info(f"input_fields = {input_fields}")
   log.info(f"config = {config}")
 
-  inference_result = {'output': 'test_inference_output'}
+  task_type_int = task_type_str_to_int[task_type_str]
+  config = Config(parameters_dict=config)
+  runnable_model = conn.get_model_from_id(model_id)
+  tokenizer = tokenizers.get(model_id, UniversalTokenizer(runnable_model))
+  tokenizers[model_id] = tokenizer
+  output, microseconds = inferer.infer(
+    model=runnable_model,
+    task_type=task_type_int,
+    input_fields=input_fields,
+    config=config,
+    tokenizer=tokenizer)
+
+  inference_result = {'output': output, 'microseconds': microseconds}
   return HttpResponse(json.dumps(inference_result))
 

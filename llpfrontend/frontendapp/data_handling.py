@@ -162,6 +162,27 @@ class DatabaseConnector:
     unique_models = self.models.distinct('_id')
     return list(unique_models)
   
+  
+  def get_model_from_id(self, _id) -> Union[RunnableModel, None]:
+    # todo: make it use propper cursors
+    model_cursor = list(self.models.find({'_id': _id}))
+    if len(model_cursor) == 0:
+      log.error(f'Could not find model ID {_id}')
+      return None
+    else:
+      model_obj = model_cursor[0]
+
+    return RunnableModel(
+        _id=model_obj['_id'],
+        owner=model_obj['owner'],
+        name=model_obj['name'],
+        source=model_obj['source'],
+        context_size=model_obj['tracking_history'][-1]['context_size'],
+        hf_inferable=model_obj['tracking_history'][-1]['hf_inference_api_supported'],
+        available=model_obj['tracking_history'][-1]['available'],
+        price=max(model_obj['tracking_history'][-1]['price_completion'], model_obj['tracking_history'][-1]['price_prompt']),
+        discount=model_obj['tracking_history'][-1].get('discount', 0.0))
+  
 
   def get_finished_evaluations_for_model(self, model_id) -> list:
     evaluations = self.experiments.find({
