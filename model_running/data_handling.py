@@ -463,7 +463,7 @@ def _load_raw_multiplication_data() -> Dict:
       input_id = f'{left_value}:{right_value}'
       equation = f'{left_value}*{right_value}='
       answer = int(left_value * right_value)
-      final_equations[input_id] = {'expression': equation, 'answer': answer}
+      final_equations[input_id] = (equation, answer)
   
   return final_equations
 
