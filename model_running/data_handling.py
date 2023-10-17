@@ -462,7 +462,7 @@ def _load_raw_multiplication_data() -> Dict:
     for right_value in sampled_range:
       input_id = f'{left_value}:{right_value}'
       equation = f'{left_value}*{right_value}='
-      answer = float(left_value * right_value)
+      answer = int(left_value * right_value)
       final_equations[input_id] = {'expression': equation, 'answer': answer}
   
   return final_equations
