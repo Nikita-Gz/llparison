@@ -183,6 +183,39 @@ Here is the user's post history:
   return final_text, total_token_count, cut_posts
 
 
+NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES = 'with examples'
+def _construct_multiplication_prompt(
+    math_expression: str,
+    config: Dict,
+    tokenizer: UniversalTokenizer,
+    **kwargs) -> Tuple[str, int, int]:
+  """Creates basic math prompt (with or without examples)"""
+  request_to_the_model = 'Correctly solve the following math problems:\n'
+  strings_to_join = [request_to_the_model]
+
+  # decides whether or not to add examples
+  examples ="""834*12=10008
+942*105=98910
+17*23=391
+48*78 = 3744
+266*19=5054
+659*943=621437
+4*22=88
+873*246=214758
+136*57=7752
+18*18=324\n"""
+  prompt_type = config.get('prompt_type', 'default')
+  if prompt_type == NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES:
+    strings_to_join.append(examples)
+  
+  strings_to_join.append(math_expression)
+
+  final_text = ''.join(strings_to_join)
+  total_token_count = len(tokenizer.encode(final_text))
+
+  return final_text, total_token_count, 0
+
+
 PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor functions
   TaskType.READING_COMPREHENSION: {
     'default': _construct_default_reading_comprehension_prompt
@@ -190,6 +223,11 @@ PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor func
   TaskType.BOT_DETECTION: {
     'default': _construct_default_bot_detection_prompt,
     'without explaination': _construct_default_bot_detection_prompt
+  },
+  TaskType.MULTIPLICATION: {
+    'default': _construct_multiplication_prompt,
+    NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES: _construct_multiplication_prompt,
+    'without examples': _construct_multiplication_prompt
   }
 }
 
@@ -217,6 +255,8 @@ class PromptConstructor:
     - - question_dict: dict
     - Bot Detection:
     - - post_history: List[str]
+    - Basic Math:
+    - - math_expression: str
 
     Returns the prompt text, token count, as well as the number of tokens it was cut by
     """

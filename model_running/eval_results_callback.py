@@ -2,8 +2,10 @@ import string
 import re
 import logging
 import pickle
+import numpy as np
 from collections import Counter
 from typing import *
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error
 
 from data_handling import DatabaseConnector
 from task_type import TaskType
@@ -113,6 +115,39 @@ class EvaluationResultsCallback:
     return metrics
   
 
+  def _compute_multiplication_metrics(self):
+    log.info(f'Computing metrics for multiplication')
+    processed_output_values = self.processed_outputs.values()
+    accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
+
+    # assembles float arrays of predictions and of true values for input codes that have an answer
+    unfit_answers = 0
+    preds = []
+    true_values = []
+    r2_score, mean_squared_error, mean_absolute_percentage_error
+    for input_code, output in self.processed_outputs.items():
+      prediction = output['interpreted_output']
+      if prediction is None:
+        unfit_answers += 1
+        continue
+      
+      preds.append(float(prediction))
+      true_values.append(float(self.test_data[input_code]))
+    preds = np.array(preds)
+    true_values = np.array(true_values)
+    
+    unfit_answers_portion = unfit_answers / len(self.processed_outputs)
+    metrics = {
+      'R2': r2_score(true_values, preds),
+      'RMSE': mean_squared_error(true_values, preds) ** 0.5,
+      'MAPE': mean_absolute_percentage_error(true_values, preds),
+      'accuracy': accuracy,
+      'unfit_answers': unfit_answers_portion
+    }
+    log.info(f'Metrics: {metrics}')
+    return metrics
+
+
   def _dump_db_if_applicable(self):
     if self.path_to_save_db_on_update is not None:
       log.info(f'Dumping DB')
@@ -157,6 +192,8 @@ class EvaluationResultsCallback:
       metrics = self._compute_reading_comprehension_metrics()
     elif self.task == TaskType.BOT_DETECTION:
       metrics = self._compute_bot_detection_metrics()
+    elif self.task == TaskType.MULTIPLICATION:
+      metrics = self._compute_multiplication_metrics()
     else:
       raise NotImplementedError(f'Metrics for task {self.task} are NYI')
     
@@ -218,16 +255,49 @@ class EvaluationResultsCallback:
     return processed_output
 
 
+  def _process_multiplication_raw_output(self, raw_output: str, input_code: str) -> dict:
+    """Processes the raw model output into an interpreted output format applicable for the multiplication task"""
+
+    def get_multiplication_answer_from_model_output(model_output: str) -> Union[int, None]:
+      """Returns the parsed int from the answer by looking for the first full integer in the output"""
+      assert model_output is not None, "Model output is none"
+      matches = re.findall(r'\d+', model_output) # type: List[str]
+      if len(matches) == 0:
+        return None
+      first_answer = matches[0]
+      return int(first_answer)
+
+    interpreted_model_answer = get_multiplication_answer_from_model_output(raw_output)
+    correct_answer = self.test_data[input_code]
+
+    if interpreted_model_answer is not None:
+      correct = interpreted_model_answer == correct_answer
+    else:
+      correct = False
+    processed_output = {
+      'interpreted_output': interpreted_model_answer,
+      'model_output': raw_output,
+      'input_code': input_code,
+      'correct': correct
+    }
+    return processed_output
+
+
   def record_output(self, model_raw_output: str, input_code: str, **kwargs) -> None:
     assert input_code not in self.processed_outputs.keys(), f'input code {input_code} is already recorded ({self.processed_outputs.get(input_code, None)})'
-    if self.task == TaskType.READING_COMPREHENSION:
-      processed_output = self._process_reading_comprehension_raw_output(model_raw_output, input_code)
-      self.processed_outputs[input_code] = processed_output
-    elif self.task == TaskType.BOT_DETECTION:
-      processed_output = self._process_bot_detection_raw_output(model_raw_output, input_code)
-      self.processed_outputs[input_code] = processed_output
-    else:
+
+    # these functions convert model's raw output into the output appropriate for the task
+    output_interpreter = {
+      TaskType.READING_COMPREHENSION: self._process_reading_comprehension_raw_output,
+      TaskType.BOT_DETECTION: self._process_reading_comprehension_raw_output,
+      TaskType.MULTIPLICATION: self._process_multiplication_raw_output
+    }.get(self.task, None)
+
+    if output_interpreter is None:
       raise NotImplementedError(f'Task {self.task} is NYI')
+
+    processed_output = output_interpreter(model_raw_output, input_code)
+    self.processed_outputs[input_code] = processed_output
     
     if self.db_connection is not None:
       self._cache_or_write_output_to_db(processed_output)
