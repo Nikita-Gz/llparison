@@ -5,7 +5,7 @@ import pickle
 from collections import Counter
 from typing import *
 
-from model_data_loader import DatabaseConnector
+from data_handling import DatabaseConnector
 from task_type import TaskType
 
 log = logging.getLogger("eval_results_callback.py")

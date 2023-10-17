@@ -397,3 +397,42 @@ class DatabaseConnector:
   def save_models_tracking(self, models: pd.DataFrame):
     #return
     self.tracking_history.insert_many(models.to_dict('records'))
+
+
+def load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
+  log.info('Loading RC dataset')
+  with open("./rc_dataset.txt", 'r') as file:
+    dataset = json.load(file)
+  rc_texts = dataset['texts']
+  rc_questions = dataset['questions']
+  return rc_texts, rc_questions
+
+
+def load_raw_bot_detection_data() -> Dict[str, Tuple[bool, List[str]]]:
+  """Fills BOT_DETECTION_DATASET with data of the following format:
+
+  {
+    input_code:
+    (
+      bool, # true if the post is made by a bot
+
+      [str, ...] # post history
+    )
+  }
+
+  Input code is represented by user ID
+  """
+
+  log.info('Loading bot detection dataset')
+  with open("./bot_or_not.json", 'r') as file:
+    dataset = json.load(file)
+  
+  # keeps only necessary data, transform into the required format
+  dataset = {
+    dataset_entry['user_id']: (
+      True if dataset_entry['human_or_bot'] == 'bot' else False,
+      dataset_entry['post_history']
+    )
+    for dataset_entry in dataset
+  }
+  return dataset

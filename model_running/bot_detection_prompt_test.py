@@ -3,7 +3,7 @@ import json
 import logging
 import datetime
 
-from model_data_loader import DatabaseConnector
+from data_handling import DatabaseConnector
 from task import Task
 from task_type import TaskType
 from prompt_constructor import UniversalTokenizer, PromptConstructor

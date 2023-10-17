@@ -2,7 +2,7 @@ import logging
 import datetime
 import time
 
-from model_data_loader import DatabaseConnector
+from data_handling import DatabaseConnector
 from task import Task
 from task_type import TaskType
 
