@@ -13,11 +13,12 @@ from pymongo import UpdateMany, UpdateOne
 from dateutil.parser import parse as parse_date
 import pymongo
 
+from task_type import TaskType
 from runnable_model_data import RunnableModel
 from task_output import TaskOutput
 from run_config import Config
 
-log = logging.getLogger("model_data_loader.py")
+log = logging.getLogger("data_handling.py")
 logging.basicConfig(level=logging.INFO)
 
 class DatabaseConnector:
@@ -399,7 +400,7 @@ class DatabaseConnector:
     self.tracking_history.insert_many(models.to_dict('records'))
 
 
-def load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
+def _load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
   log.info('Loading RC dataset')
   with open("./rc_dataset.txt", 'r') as file:
     dataset = json.load(file)
@@ -408,7 +409,7 @@ def load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
   return rc_texts, rc_questions
 
 
-def load_raw_bot_detection_data() -> Dict[str, Tuple[bool, List[str]]]:
+def _load_raw_bot_detection_data() -> Dict[str, Tuple[bool, List[str]]]:
   """Fills BOT_DETECTION_DATASET with data of the following format:
 
   {
@@ -436,3 +437,21 @@ def load_raw_bot_detection_data() -> Dict[str, Tuple[bool, List[str]]]:
     for dataset_entry in dataset
   }
   return dataset
+
+
+def load_appropriate_dataset_for_task(task_type: TaskType) -> Any:
+  """
+  - For reading comprehension: returns a dict of {input_code: question text} and a dict of {input_code: question data}
+  - For bot detection: returns a dict of {input_code: (is a bot, list of post history strings)}
+  - For bsic math: returns a dict of {input_code: math expression like "90+47="} 
+  """
+  appropriate_data_loader_for_task = {
+    TaskType.READING_COMPREHENSION: _load_raw_reading_comprehension_data,
+    TaskType.BOT_DETECTION: _load_raw_bot_detection_data
+  }.get(task_type, None)
+
+  if appropriate_data_loader_for_task is not None:
+    return appropriate_data_loader_for_task()
+  else:
+    raise TypeError(f"Unknown task: {task_type}")
+

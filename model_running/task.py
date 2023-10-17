@@ -13,7 +13,7 @@ from dateutil.parser import parse as parse_date
 
 
 from model_runner import ModelRunner
-from data_handling import DatabaseConnector, load_raw_bot_detection_data, load_raw_reading_comprehension_data
+from data_handling import DatabaseConnector, load_appropriate_dataset_for_task
 from runnable_model_data import RunnableModel
 from run_config import Config
 from task_output import TaskOutput
@@ -40,7 +40,8 @@ class Task:
     # todo: implement this
     return True
 
-  
+
+  # TODO: combine code that prepares datasets for different tasks into one flexible funciton
   def _load_and_prepare_reading_comprehension_prompts(
       self,
       excluded_input_ids: set,
@@ -50,7 +51,7 @@ class Task:
       Returns the dataset as a dict of {question_id: prompt}, total token count, number of cut prompts, and validation data for each input code"""
     log.info('Preparing RC prompts')
 
-    rc_texts, rc_questions = load_raw_reading_comprehension_data()
+    rc_texts, rc_questions = load_appropriate_dataset_for_task(self.type)
 
     # converts the returned rc_texts (dict of texts by input code) and rc_questions (dict of question data by input code)
     # into the following format:
@@ -94,7 +95,7 @@ class Task:
       Returns the dataset as a dict of {input_id: prompt}, total token count, number of cut prompts, and validation data for each input code"""
     log.info('Preparing bot detection prompts')
 
-    bot_detection_dataset = load_raw_bot_detection_data()
+    bot_detection_dataset = load_appropriate_dataset_for_task(self.type)
     prepared_prompts = dict()
     excluded_count = 0
     cut_posts_count = 0
