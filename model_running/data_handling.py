@@ -477,7 +477,7 @@ def load_appropriate_dataset_for_task(task_type: TaskType) -> Any:
   appropriate_data_loader_for_task = {
     TaskType.READING_COMPREHENSION: _load_raw_reading_comprehension_data,
     TaskType.BOT_DETECTION: _load_raw_bot_detection_data,
-    TaskType.BASIC_MULTIPLICATION: _load_raw_multiplication_data
+    TaskType.MULTIPLICATION: _load_raw_multiplication_data
   }.get(task_type, None)
 
   if appropriate_data_loader_for_task is not None:
