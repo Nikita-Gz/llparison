@@ -13,14 +13,14 @@ from dateutil.parser import parse as parse_date
 
 
 from model_runner import ModelRunner
-from model_data_loader import DatabaseConnector
+from data_handling import DatabaseConnector, load_appropriate_dataset_for_task
 from runnable_model_data import RunnableModel
 from run_config import Config
 from task_output import TaskOutput
 from task_type import TaskType, task_type_int_to_str, new_tokens_limit_per_task_type_int
 from cost_callback import CostCallback
 from eval_results_callback import EvaluationResultsCallback
-from prompt_constructor import PromptConstructor, UniversalTokenizer
+from prompt_constructor import PromptConstructor, UniversalTokenizer, NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES
 
 # todo: !! custom tasks must be saved to db and loaded from it
 
@@ -40,45 +40,8 @@ class Task:
     # todo: implement this
     return True
 
-  def _load_raw_reading_comprehension_data(self) -> Tuple[Dict, Dict]:
-    log.info('Loading RC dataset')
-    with open("./rc_dataset.txt", 'r') as file:
-      dataset = json.load(file)
-    rc_texts = dataset['texts']
-    rc_questions = dataset['questions']
-    return rc_texts, rc_questions
 
-
-  def _load_raw_bot_detection_data(self) -> Dict[str, Tuple[bool, List[str]]]:
-    """Fills BOT_DETECTION_DATASET with data of the following format:
-
-    {
-      input_code:
-      (
-        bool, # true if the post is made by a bot
-
-        [str, ...] # post history
-      )
-    }
-
-    Input code is represented by user ID
-    """
-
-    log.info('Loading bot detection dataset')
-    with open("./bot_or_not.json", 'r') as file:
-      dataset = json.load(file)
-    
-    # keeps only necessary data, transform into the required format
-    dataset = {
-      dataset_entry['user_id']: (
-        True if dataset_entry['human_or_bot'] == 'bot' else False,
-        dataset_entry['post_history']
-      )
-      for dataset_entry in dataset
-    }
-    return dataset
-
-  
+  # TODO: combine code that prepares datasets for different tasks into one flexible funciton
   def _load_and_prepare_reading_comprehension_prompts(
       self,
       excluded_input_ids: set,
@@ -88,9 +51,10 @@ class Task:
       Returns the dataset as a dict of {question_id: prompt}, total token count, number of cut prompts, and validation data for each input code"""
     log.info('Preparing RC prompts')
 
-    rc_texts, rc_questions = self._load_raw_reading_comprehension_data()
+    rc_texts, rc_questions = load_appropriate_dataset_for_task(self.type)
 
-    # prepared_prompts will have the following format:
+    # converts the returned rc_texts (dict of texts by input code) and rc_questions (dict of question data by input code)
+    # into the following format:
     # {
     #   input_code: prompt_text
     # }
@@ -99,7 +63,6 @@ class Task:
     prompt_constructor = PromptConstructor(
       task_type=self.type,
       configuration_dict=configuration.to_dict())
-
     tokenizer = UniversalTokenizer(model)
     total_token_count = 0
     total_prompts_cut = 0
@@ -132,7 +95,7 @@ class Task:
       Returns the dataset as a dict of {input_id: prompt}, total token count, number of cut prompts, and validation data for each input code"""
     log.info('Preparing bot detection prompts')
 
-    bot_detection_dataset = self._load_raw_bot_detection_data()
+    bot_detection_dataset = load_appropriate_dataset_for_task(self.type)
     prepared_prompts = dict()
     excluded_count = 0
     cut_posts_count = 0
@@ -164,6 +127,46 @@ class Task:
     return prepared_prompts, total_token_count, cut_posts_count, validation_data
 
 
+  def _load_and_prepare_multiplication_prompts(
+      self,
+      excluded_input_ids: set,
+      configuration: Config,
+      model: RunnableModel) -> Tuple[Dict, int, int, Dict]:
+    """Loads multiplication data as prompts, excluding a set of IDs.
+      Returns the dataset as a dict of {input_id: prompt}, total token count, number of cut prompts, and validation data for each input code"""
+    log.info('Preparing multiplication prompts')
+
+    multiplication_dataset = load_appropriate_dataset_for_task(self.type)
+    prepared_prompts = dict()
+    validation_data = dict()
+    excluded_count = 0
+    cut_posts_count = 0
+    total_token_count = 0
+    prompt_constructor = PromptConstructor(
+      task_type=self.type,
+      configuration_dict=configuration.to_dict())
+    tokenizer = UniversalTokenizer(model)
+    for i, (input_id, (expression, answer)) in enumerate(multiplication_dataset.items()):
+      validation_data[input_id] = answer
+
+      if input_id in excluded_input_ids:
+        excluded_count += 1
+        continue
+
+      prompt_text, token_count, _ = prompt_constructor.construct_prompt(
+        model=model,
+        tokenizer=tokenizer,
+        math_expression=expression)
+      prepared_prompts[input_id] = prompt_text
+      total_token_count += token_count
+      
+      if i % 100 == 0:
+        log.info(f'Processed multiplication prompt {i} out of {len(multiplication_dataset)}')
+
+    log.info(f'Loaded {len(prepared_prompts)} prompts, ({excluded_count} were excluded, {cut_posts_count} were cut, {total_token_count} total tokens)')
+    return prepared_prompts, total_token_count, cut_posts_count, validation_data
+
+
   def _load_and_prepare_prompts_for_task(
       self,
       excluded_input_ids: set,
@@ -171,18 +174,15 @@ class Task:
       model: RunnableModel) -> Tuple[Dict, int, int, Dict]:
     """Loads data as prompts, excluding a set of IDs.
       Returns the dataset as a dict of {input_id: prompt}, total token count, the number of cut prompts, and validation data for each input code"""
-    if self.type == TaskType.READING_COMPREHENSION:
-      return self._load_and_prepare_reading_comprehension_prompts(
-        excluded_input_ids=excluded_input_ids,
-        configuration=configuration,
-        model=model)
-    elif self.type == TaskType.BOT_DETECTION:
-      return self._load_and_prepare_bot_detection_prompts(
-        excluded_input_ids=excluded_input_ids,
-        configuration=configuration,
-        model=model)
-    else:
-      raise TypeError(f'Unknown task type of {self.type}')
+    prompt_preparators = {
+      TaskType.READING_COMPREHENSION: self._load_and_prepare_reading_comprehension_prompts,
+      TaskType.BOT_DETECTION: self._load_and_prepare_bot_detection_prompts,
+      TaskType.MULTIPLICATION: self._load_and_prepare_multiplication_prompts,
+    }
+    return prompt_preparators[self.type](
+      excluded_input_ids=excluded_input_ids,
+      configuration=configuration,
+      model=model)
 
 
   def _get_reading_comprehension_answer_id_from_model_output(self, model_output: str) -> Union[int, None]:
@@ -216,12 +216,22 @@ class Task:
     
     def get_configs_for_bot_detection(model: RunnableModel) -> List[Config]:
       config1 = Config()
-      config1.set_parameter('prompt_type', 'without examples')
+      config1.set_parameter('prompt_type', 'without explaination')
       return [config1]
+    
+    def get_configs_for_multiplication(model: RunnableModel) -> List[Config]:
+      config1 = Config()
+      config1.set_parameter('prompt_type', 'without examples')
+      config1.set_parameter('top-k', 1)
+      config2 = Config()
+      config2.set_parameter('prompt_type', NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES)
+      config2.set_parameter('top-k', 1)
+      return [config1, config2]
       
     config_creators_by_task_types = {
       TaskType.READING_COMPREHENSION: get_configs_for_rc,
-      TaskType.BOT_DETECTION: get_configs_for_bot_detection
+      TaskType.BOT_DETECTION: get_configs_for_bot_detection,
+      TaskType.MULTIPLICATION: get_configs_for_multiplication
     }
     config_creator = config_creators_by_task_types[self.type] # type: Callable
     

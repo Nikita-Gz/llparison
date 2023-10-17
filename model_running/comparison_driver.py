@@ -5,7 +5,7 @@ import datetime
 
 from task import Task, TaskType
 from runnable_model_data import RunnableModel
-from model_data_loader import DatabaseConnector
+from data_handling import DatabaseConnector
 from run_config import Config
 from task_output import TaskOutput
 from model_runner import ModelRunner

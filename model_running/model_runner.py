@@ -27,9 +27,9 @@ import torch
 from transformers import AutoTokenizer
 from transformers import pipeline
 
-from .run_config import Config
-from .runnable_model_data import RunnableModel
-from .eval_results_callback import EvaluationResultsCallback
+from run_config import Config
+from runnable_model_data import RunnableModel
+from eval_results_callback import EvaluationResultsCallback
 
 log = logging.getLogger(os.path.basename(__file__))
 logging.basicConfig(level=logging.INFO)
