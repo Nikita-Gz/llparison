@@ -179,7 +179,7 @@ class Task:
     
     def get_configs_for_bot_detection(model: RunnableModel) -> List[Config]:
       config1 = Config()
-      config1.set_parameter('prompt_type', 'without examples')
+      config1.set_parameter('prompt_type', 'without explaination')
       return [config1]
       
     config_creators_by_task_types = {

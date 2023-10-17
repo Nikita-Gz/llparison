@@ -189,7 +189,7 @@ PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor func
   },
   TaskType.BOT_DETECTION: {
     'default': _construct_default_bot_detection_prompt,
-    'without examples': _construct_default_bot_detection_prompt
+    'without explaination': _construct_default_bot_detection_prompt
   }
 }
 
