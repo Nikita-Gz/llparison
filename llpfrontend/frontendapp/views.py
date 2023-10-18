@@ -285,11 +285,10 @@ def _get_prompt_for_model_config_combination(
   try:
     prompt = PromptConstructor(
       task_type=task_type_str_to_int[task_type_str],
-      configuration_dict=config
-      ).construct_prompt(
-        tokenizer=tokenizer,
-        model=model,
-        **kwargs)[0]
+      configuration_dict=config,
+      model=model,
+      existing_tokenizer=tokenizer
+      ).construct_prompt(**kwargs)[0]
   except Exception as e:
     log.error(f'Exception when constructing prompt: {e}')
     prompt = 'No prompt available for this combination'
