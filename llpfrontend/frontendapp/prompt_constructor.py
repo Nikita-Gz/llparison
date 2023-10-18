@@ -139,12 +139,15 @@ def _construct_default_bot_detection_prompt(
     model: RunnableModel,
     task_type: TaskType,
     tokenizer: UniversalTokenizer,
+    config: Dict,
     **kwargs) -> Tuple[str, int, int]:
   """Creates a default bot detection prompt, matching for the model
   
   Returns the prompt, token count, and the number of posts it was cut by"""
 
-  header_text = """You are a helpful bot detection program. You will read the posts made by a user, and determine if they were made by a bot (Y/N). Here is the example:
+  introduction_text = """You are a helpful bot detection program. You will read the posts made by a user, and determine if they were made by a bot (Y/N)."""
+  explaination_text = """ Posts made by a bot may usually involve advertisements (including with links), repeated posts, news titles, or they sound too monotonous."""
+  examples_text = """\nHere are the examples:
 Post: Airline employee steals plane from Seattle airport, crashes and dies - CNN: CNN Airline employee steals plane from Seattle airport, crashes and dies CNN (CNN) An airline employee stole an otherwise unoccupied passenger plane Friday from the\u2026 https://t.co/2FbjpYYuUH https://t.co/gtvQKqz4YG
 Was this written by a bot?: "Y"
 Post: Late night video editing. Finishing it up pre' soon. Hopefully I'll be able to put it up on YouTube in… http://t.co/9OtxogubwQ
@@ -155,6 +158,12 @@ Post: Children at Play, ca. 1895-1897 https://t.co/P9Mpn4TNYS https://t.co/MJR7l
 Was this written by a bot?: "Y"
 Here is the user's post history:
 """
+  using_explaination = config.get('prompt_type', 'without explaination') == 'with explaination'
+  if using_explaination:
+    header_text = introduction_text + explaination_text + examples_text
+  else:
+    header_text = introduction_text + examples_text
+
   suffix_text = 'Were these posts made by a bot?: "'
   encoded_necessary_text = tokenizer.encode([header_text, suffix_text])
   necessary_text_token_count = sum([len(tokens) for tokens in encoded_necessary_text]) + new_tokens_limit_per_task_type_int[task_type]
@@ -167,8 +176,8 @@ Here is the user's post history:
   '''
   posts_current_token_count = 0
   posts_to_add = []
-  for i, post in enumerate(post_history):
-    post_text_to_add = f'Post {i+1}) {post}\n###\n'
+  for i, post in enumerate(post_history[:16]):
+    post_text_to_add = f'Post {i+1}) {post}\n'
     post_token_size = len(tokenizer.encode(post_text_to_add))
     posts_new_token_count = posts_current_token_count + post_token_size
     if posts_new_token_count < max_allowed_tokens_for_posts:
@@ -183,13 +192,52 @@ Here is the user's post history:
   return final_text, total_token_count, cut_posts
 
 
+NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES = 'with examples'
+def _construct_multiplication_prompt(
+    math_expression: str,
+    config: Dict,
+    tokenizer: UniversalTokenizer,
+    **kwargs) -> Tuple[str, int, int]:
+  """Creates basic math prompt (with or without examples)"""
+  request_to_the_model = 'Correctly solve the following math problems:\n'
+  strings_to_join = [request_to_the_model]
+
+  # decides whether or not to add examples
+  examples ="""834*12=10008
+942*105=98910
+17*23=391
+48*78 = 3744
+266*19=5054
+659*943=621437
+4*22=88
+873*246=214758
+136*57=7752
+18*18=324\n"""
+  prompt_type = config.get('prompt_type', 'default')
+  if prompt_type == NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES:
+    strings_to_join.append(examples)
+  
+  strings_to_join.append(math_expression)
+
+  final_text = ''.join(strings_to_join)
+  total_token_count = len(tokenizer.encode(final_text))
+
+  return final_text, total_token_count, 0
+
+
 PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor functions
   TaskType.READING_COMPREHENSION: {
     'default': _construct_default_reading_comprehension_prompt
   },
   TaskType.BOT_DETECTION: {
     'default': _construct_default_bot_detection_prompt,
-    'without examples': _construct_default_bot_detection_prompt
+    'without explaination': _construct_default_bot_detection_prompt,
+    'with explaination': _construct_default_bot_detection_prompt
+  },
+  TaskType.MULTIPLICATION: {
+    'default': _construct_multiplication_prompt,
+    NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES: _construct_multiplication_prompt,
+    'without examples': _construct_multiplication_prompt
   }
 }
 
@@ -217,6 +265,8 @@ class PromptConstructor:
     - - question_dict: dict
     - Bot Detection:
     - - post_history: List[str]
+    - Basic Math:
+    - - math_expression: str
 
     Returns the prompt text, token count, as well as the number of tokens it was cut by
     """
