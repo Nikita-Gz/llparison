@@ -146,7 +146,7 @@ def _construct_default_bot_detection_prompt(
   Returns the prompt, token count, and the number of posts it was cut by"""
 
   introduction_text = """You are a helpful bot detection program. You will read the posts made by a user, and determine if they were made by a bot (Y/N)."""
-  explaination_text = """ Posts made by a bot usually involve advertisements (including with links) or same repeated posts, news titles, or sound too monotonous."""
+  explaination_text = """ Posts made by a bot may usually involve advertisements (including with links), repeated posts, news titles, or they sound too monotonous."""
   examples_text = """\nHere are the examples:
 Post: Airline employee steals plane from Seattle airport, crashes and dies - CNN: CNN Airline employee steals plane from Seattle airport, crashes and dies CNN (CNN) An airline employee stole an otherwise unoccupied passenger plane Friday from the\u2026 https://t.co/2FbjpYYuUH https://t.co/gtvQKqz4YG
 Was this written by a bot?: "Y"
@@ -176,8 +176,8 @@ Here is the user's post history:
   '''
   posts_current_token_count = 0
   posts_to_add = []
-  for i, post in enumerate(post_history):
-    post_text_to_add = f'Post {i+1}) {post}\n###\n'
+  for i, post in enumerate(post_history[:16]):
+    post_text_to_add = f'Post {i+1}) {post}\n'
     post_token_size = len(tokenizer.encode(post_text_to_add))
     posts_new_token_count = posts_current_token_count + post_token_size
     if posts_new_token_count < max_allowed_tokens_for_posts:
