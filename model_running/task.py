@@ -217,7 +217,9 @@ class Task:
     def get_configs_for_bot_detection(model: RunnableModel) -> List[Config]:
       config1 = Config()
       config1.set_parameter('prompt_type', 'without explaination')
-      return [config1]
+      config2 = Config()
+      config2.set_parameter('prompt_type', 'with explaination')
+      return [config1, config2]
     
     def get_configs_for_multiplication(model: RunnableModel) -> List[Config]:
       config1 = Config()

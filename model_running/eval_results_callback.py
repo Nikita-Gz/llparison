@@ -289,7 +289,7 @@ class EvaluationResultsCallback:
     # these functions convert model's raw output into the output appropriate for the task
     output_interpreter = {
       TaskType.READING_COMPREHENSION: self._process_reading_comprehension_raw_output,
-      TaskType.BOT_DETECTION: self._process_reading_comprehension_raw_output,
+      TaskType.BOT_DETECTION: self._process_bot_detection_raw_output,
       TaskType.MULTIPLICATION: self._process_multiplication_raw_output
     }.get(self.task, None)
 
