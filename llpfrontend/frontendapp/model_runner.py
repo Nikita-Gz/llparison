@@ -77,7 +77,7 @@ class ModelRunner:
     model_pipeline = pipeline(
       "text-generation",
       model=self._hf_model_name,
-      device_map='auto',
+      device_map=0,
       tokenizer=AutoTokenizer.from_pretrained(self._hf_model_name),
       torch_dtype=torch.float16)
 
