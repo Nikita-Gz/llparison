@@ -312,7 +312,7 @@ class PromptConstructor:
       task_type: TaskType,
       configuration_dict: dict,
       model: RunnableModel,
-      existing_tokenizer: Union[UniversalTokenizer, None]) -> None:
+      existing_tokenizer: Union[UniversalTokenizer, None] = None) -> None:
     self.model = model
     self.task_type = task_type
     self.configuration_dict = configuration_dict
