@@ -276,11 +276,11 @@ def _construct_multiplication_prompt(
   if prompt_type == NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES:
     assistant_strings.append(examples)
   
-  assistant_strings.append(math_expression)
+  assistant_strings.append('\n' + math_expression)
 
   final_text = (prompt_alterator.start() +
                 prompt_alterator.instruction(instruction_string) +
-                prompt_alterator.assistant_text('\n'.join(assistant_strings)))
+                prompt_alterator.assistant_text(''.join(assistant_strings)))
   total_token_count = len(tokenizer.encode(final_text))
 
   return final_text, total_token_count, 0
