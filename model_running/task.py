@@ -271,7 +271,7 @@ class Task:
         log.info(f'Combination was never tested completely, adding it to combinations up for evaluations')
         combinations_to_evaluate.append(considered_combination)
       elif model_source in PROPRIETARY_SOURCES_LIST:
-        time_since_last_experiment = current_date - parse_date(latest_experiment['date'])
+        time_since_last_experiment = parse_date(current_date) - parse_date(latest_experiment['date'])
         if time_since_last_experiment > PROPRIETARY_MODEL_TIMEOUT:
           log.info(f'Combination is proprietary and was not tested in a while ({str(time_since_last_experiment)}), adding it to combinations up for evaluations')
           combinations_to_evaluate.append(considered_combination)
