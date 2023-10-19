@@ -448,7 +448,7 @@ class Task:
         max_new_tokens=new_tokens_limit_per_task_type_int[self.type])
       evaluation_callback.finalize_evaluation()
     except Exception as e:
-      log.error(e)
+      log.error(e.with_traceback(None))
       raise e
     
     # checks if all evaluations were completed, save metrics if so, complain and die if not
