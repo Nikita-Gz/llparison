@@ -34,9 +34,18 @@ class InferenceRunner:
   
 
   def _make_bot_detection_prompt_arguments(self, input_fields: Dict[str, str]) -> Dict:
-    """Returns kwargs to be sent to prompt constructor when running reading comprehension task"""
+    """Returns kwargs to be sent to prompt constructor when running bot detection task"""
     created_arguments = {
       'post_history': input_fields['Post history'].split('\n')
+    }
+    log.info(f'Created the following inference arguments: {created_arguments}')
+    return created_arguments
+
+
+  def _make_multiplication_prompt_arguments(self, input_fields: Dict[str, str]) -> Dict:
+    """Returns kwargs to be sent to prompt constructor when running multiplication task"""
+    created_arguments = {
+      'math_expression': input_fields['Math expression']
     }
     log.info(f'Created the following inference arguments: {created_arguments}')
     return created_arguments
@@ -56,7 +65,8 @@ class InferenceRunner:
 
     prompt_constructor_kwargs_builder = {
       TaskType.READING_COMPREHENSION: self._make_reading_comprehension_prompt_arguments,
-      TaskType.BOT_DETECTION: self._make_bot_detection_prompt_arguments
+      TaskType.BOT_DETECTION: self._make_bot_detection_prompt_arguments,
+      TaskType.MULTIPLICATION: self._make_multiplication_prompt_arguments
     }[task_type]
 
 
