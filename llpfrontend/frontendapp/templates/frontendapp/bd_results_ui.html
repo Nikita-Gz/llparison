@@ -1,12 +1,12 @@
 <div>
   <div id="task_details">
-    <labe>User's post history (user ID = {{input_code}}): </label>
+    <label>User's post history (user ID = {{input_code}}): </label>
     <ul>
     {% for post in post_history %}
       <li>{{post}}</li>
     {% endfor %}
     </ul>
-    <labe>Is the user a bot?: {{is_bot}}</label>
+    <label>Is the user a bot?: {{is_bot}}</label>
     <br/>
   </div>
   <b>Specific model results:</b>
