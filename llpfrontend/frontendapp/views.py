@@ -8,7 +8,7 @@ from .data_handling import (
   filter_experiments_by_filters,
   aggregate_metrics_from_experiments,
   prettify_config_dict,
-  RC_QUESTIONS, RC_TEXTS, BOT_DETECTION_DATASET
+  RC_QUESTIONS, RC_TEXTS, BOT_DETECTION_DATASET, MULTIPLICATION_DATASET
 )
 from .prompt_constructor import PromptConstructor, UniversalTokenizer
 from .run_config import Config
@@ -306,6 +306,9 @@ def _get_task_specific_dataset_entry_for_input_code(task_type_str: str, input_co
   elif task_type_int == TaskType.BOT_DETECTION:
     _, post_history = BOT_DETECTION_DATASET[input_code]
     return {'post_history': post_history}
+  elif task_type_int == TaskType.MULTIPLICATION:
+    equation, answer = MULTIPLICATION_DATASET[input_code]
+    return {'math_expression': equation, 'answer': answer}
   else:
     raise Exception(f'Unknown task type "{task_type_str}"')
 
@@ -356,6 +359,10 @@ def _get_task_specific_context(input_code:str, task_type_str: str, llm_configs: 
     is_bot, post_history = question_details
     context['post_history'] = post_history
     context['is_bot'] = is_bot
+  elif task_type_as_enum == TaskType.MULTIPLICATION:
+    equation, answer = MULTIPLICATION_DATASET[input_code]
+    context['equation'] = equation
+    context['answer'] = answer
   else:
     raise Exception(f'Unknown task type "{task_type_str}"')
   
@@ -380,7 +387,8 @@ def _draw_single_test_results(request) -> HttpResponse:
 
   appropriate_render_template = {
     TaskType.READING_COMPREHENSION: 'frontendapp/rc_results_ui.html',
-    TaskType.BOT_DETECTION: 'frontendapp/bd_results_ui.html'
+    TaskType.BOT_DETECTION: 'frontendapp/bd_results_ui.html',
+    TaskType.MULTIPLICATION: 'frontendapp/multiplication_results_ui.html'
   }[task_type_str_to_int[task_type_str]]
 
   return render(request, appropriate_render_template, context)

@@ -69,6 +69,9 @@
       ],
       bot_detection: [
         'Post history'
+      ],
+      multiplication: [
+        'Math expression'
       ]
     }
 
@@ -77,6 +80,8 @@
       selected_fields = fields_for_task.reading_comprehension
     } else if (selected_task == "Bot Detection") {
       selected_fields = fields_for_task.bot_detection
+    } else if (selected_task == "Multiplication") {
+      selected_fields = fields_for_task.multiplication
     } else {
       throw ("The task " + selected_task + " is unknown")
     }
