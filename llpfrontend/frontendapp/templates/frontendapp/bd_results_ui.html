@@ -14,7 +14,7 @@
     {% for readable_name, prompt_and_counts in prompt_and_interpreted_output_counts_per_readable_llm_config_combination.items %}
       {% if prompt_and_counts.counts|length > 0 %}
         <label>Iterpreted outputs for model {{readable_name}}:</label>
-        <pre>Prompt:<p>:{{prompt_and_counts.prompt}}</p></pre>
+        <pre>Prompt:<p>{{prompt_and_counts.prompt}}</p></pre>
         <ul>
         {% for answer, count in prompt_and_counts.counts.items %}
           <li>Answer "{{answer}}" - answered {{count}} times</li>
