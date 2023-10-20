@@ -61,9 +61,9 @@ class Task:
     prepared_prompts = dict()
     excluded_count = 0
     prompt_constructor = PromptConstructor(
+      model=model,
       task_type=self.type,
       configuration_dict=configuration.to_dict())
-    tokenizer = UniversalTokenizer(model)
     total_token_count = 0
     total_prompts_cut = 0
     for question_id, question_dict in rc_questions.items():
@@ -73,9 +73,7 @@ class Task:
       question_context_text = rc_texts[question_dict['text_id']]
       prompt, token_count, cut_by_n_tokens = prompt_constructor.construct_prompt(
         context_text=question_context_text,
-        question_dict=question_dict,
-        model=model,
-        tokenizer=tokenizer)
+        question_dict=question_dict)
       prepared_prompts[question_id] = prompt
       total_token_count += token_count
       if cut_by_n_tokens > 0:
@@ -101,18 +99,15 @@ class Task:
     cut_posts_count = 0
     total_token_count = 0
     prompt_constructor = PromptConstructor(
+      model=model,
       task_type=self.type,
       configuration_dict=configuration.to_dict())
-    tokenizer = UniversalTokenizer(model)
     for i, (input_id, (_, posts)) in enumerate(bot_detection_dataset.items()):
       if input_id in excluded_input_ids:
         excluded_count += 1
         continue
 
-      prompt_text, token_count, posts_cut = prompt_constructor.construct_prompt(
-        model=model,
-        tokenizer=tokenizer,
-        post_history=posts)
+      prompt_text, token_count, posts_cut = prompt_constructor.construct_prompt(post_history=posts)
       prepared_prompts[input_id] = prompt_text
       total_token_count += token_count
       if posts_cut > 0:
@@ -143,9 +138,9 @@ class Task:
     cut_posts_count = 0
     total_token_count = 0
     prompt_constructor = PromptConstructor(
+      model=model,
       task_type=self.type,
       configuration_dict=configuration.to_dict())
-    tokenizer = UniversalTokenizer(model)
     for i, (input_id, (expression, answer)) in enumerate(multiplication_dataset.items()):
       validation_data[input_id] = answer
 
@@ -153,10 +148,7 @@ class Task:
         excluded_count += 1
         continue
 
-      prompt_text, token_count, _ = prompt_constructor.construct_prompt(
-        model=model,
-        tokenizer=tokenizer,
-        math_expression=expression)
+      prompt_text, token_count, _ = prompt_constructor.construct_prompt(math_expression=expression)
       prepared_prompts[input_id] = prompt_text
       total_token_count += token_count
       
@@ -279,7 +271,7 @@ class Task:
         log.info(f'Combination was never tested completely, adding it to combinations up for evaluations')
         combinations_to_evaluate.append(considered_combination)
       elif model_source in PROPRIETARY_SOURCES_LIST:
-        time_since_last_experiment = current_date - parse_date(latest_experiment['date'])
+        time_since_last_experiment = parse_date(current_date) - parse_date(latest_experiment['date'])
         if time_since_last_experiment > PROPRIETARY_MODEL_TIMEOUT:
           log.info(f'Combination is proprietary and was not tested in a while ({str(time_since_last_experiment)}), adding it to combinations up for evaluations')
           combinations_to_evaluate.append(considered_combination)
@@ -456,7 +448,7 @@ class Task:
         max_new_tokens=new_tokens_limit_per_task_type_int[self.type])
       evaluation_callback.finalize_evaluation()
     except Exception as e:
-      log.error(e)
+      log.error(e.with_traceback(None))
       raise e
     
     # checks if all evaluations were completed, save metrics if so, complain and die if not

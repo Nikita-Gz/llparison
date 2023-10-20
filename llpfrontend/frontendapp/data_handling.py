@@ -94,10 +94,11 @@ class DatabaseConnector:
 
     for collection, items in data.items():
       log.info(f'Inserting {len(items)} default items in {collection}')
-      try:
-        self.db[collection].insert_many(items)
-      except Exception as e:
-        log.warn(f'Got a data write error: \n' + str(e))
+      for collection_item in items:
+        try:
+          self.db[collection].insert_one(collection_item)
+        except Exception as e:
+          log.warn(f'Got a data write error: \n' + str(e))
 
 
   def _get_fake_testing_evaluations(self):
