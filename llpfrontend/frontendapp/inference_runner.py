@@ -64,11 +64,8 @@ class InferenceRunner:
       log.info(f'Constructing prompt')
 
       prompt_kwargs = prompt_constructor_kwargs_builder(input_fields)
-      prompt_ctor = PromptConstructor(task_type, config.to_dict())
-      prompt, _, _ =prompt_ctor.construct_prompt(
-        model=model,
-        tokenizer=tokenizer,
-        **prompt_kwargs)
+      prompt_ctor = PromptConstructor(task_type, config.to_dict(), model, existing_tokenizer=tokenizer)
+      prompt, _, _ =prompt_ctor.construct_prompt(**prompt_kwargs)
       
       log.info(f'Received prompt: {prompt}')
       log.info(f'Running inference')

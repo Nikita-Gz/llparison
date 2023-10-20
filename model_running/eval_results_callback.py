@@ -139,7 +139,6 @@ class EvaluationResultsCallback:
     unfit_answers_portion = unfit_answers / len(self.processed_outputs)
     metrics = {
       'R2': r2_score(true_values, preds),
-      'RMSE': mean_squared_error(true_values, preds) ** 0.5,
       'MAPE': mean_absolute_percentage_error(true_values, preds),
       'accuracy': accuracy,
       'unfit_answers': unfit_answers_portion
