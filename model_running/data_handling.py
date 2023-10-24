@@ -149,43 +149,9 @@ class DatabaseConnector:
 
   def get_models_available_for_evaluating(self) -> List[RunnableModel]:
     """
-    Returns models that share the same latest present last tracking date
+    Returns all models for now
     """
-
-    # todo: CHECK IF MODELS EXIST
-    assert self.models.count_documents({}) > 0, 'No models are present!'
-
-    #models_to_evaluate
-    # gets the latest date of tracking saved
-    latest_tracking_date = self.models.aggregate([{
-      '$project': {
-        'last_tracked': {
-          '$max': '$tracking_history.date'
-        }
-      }
-    },
-    {
-      "$sort": {
-        "last_tracked": -1
-      }
-    },
-    {
-      '$limit': 1
-    }]).next()['last_tracked']
-
-    #[0]['last_tracked']
-
-    # gets the model data at the last_tracked date
-    '''db_models = self.models.find({
-      'tracking_history.date': {'$eq': latest_tracking_date}
-    },
-    {
-      'tracking_history.$': 1
-    })'''
-    # the one above uses positional projection, but it's not supported in mongomock
-    db_models = self.models.find({
-      'tracking_history.date': {'$eq': latest_tracking_date}
-    })
+    db_models = self.models.find()
 
     models_to_return = []
     for model_obj in list(db_models): # had to make this one a list because otherwise Mongomock is non-deterministic, sometimes iterating and sometimes don't...
