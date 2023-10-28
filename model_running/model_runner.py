@@ -48,7 +48,7 @@ if HF_API_TOKEN is None:
   with open('./s/openrouter', 'r') as file:
     OPENROUTER_API_TOKEN = file.readline()
     log.warning('Got one')
-openrouter_headers={
+OPENROUTER_HEADERS={
   "HTTP-Referer": 'http://localhost',
   "Authorization": f'Bearer {OPENROUTER_API_TOKEN}'
 }
@@ -163,7 +163,8 @@ class ModelRunner:
     if self.model.name == 'rc_test_model':
       self._run_rc_test_function(payloads, callback)
     elif self.model.source == 'OpenRouter':
-      asyncio.run(self.run_openrouter_as_multiple_requests(payloads, callback, max_new_tokens=max_new_tokens))
+      #asyncio.run(self.run_openrouter_as_multiple_requests(payloads, callback, max_new_tokens=max_new_tokens))
+      self.run_openrouter_as_synchronous_requests(payloads=payloads, callback=callback, max_new_tokens=max_new_tokens)
     elif self.model.source == 'hf' and self.model.hf_inferable:
       asyncio.run(self.run_hf_inference_payload(payloads, callback))
     elif self.model.source == 'hf' and not self.model.hf_inferable:
@@ -196,7 +197,7 @@ class ModelRunner:
       nonlocal retry_count
       while retry_count <= MAX_RETRIES:
         retry_count += 1
-        async with session.request("POST", API_URL, headers=openrouter_headers, data=request_data_json) as response:
+        async with session.request("POST", API_URL, headers=OPENROUTER_HEADERS, data=request_data_json) as response:
           log.info(f'Requesting from OpenRouter')
           response_txt = await response.text()
 
@@ -253,6 +254,61 @@ class ModelRunner:
       session.close()
       raise e
     session.close()
+
+
+  def run_openrouter_as_synchronous_requests(
+      self,
+      payloads: Dict[str, str],
+      callback: EvaluationResultsCallback,
+      max_new_tokens: int):
+    log.info(f'Running model {self.model._id} via OpenRouter inference API with synchronous requests')
+
+    API_URL = 'https://openrouter.ai/api/v1/chat/completions'
+    model_parameters = self.assemble_model_parameters(max_new_tokens=max_new_tokens)
+    model_parameters['max_tokens'] = model_parameters['max_new_tokens']
+
+    def make_synchronous_request(data_json) -> Union[str, None]:
+      retry_count = 0
+      MAX_RETRIES = 100
+      WAIT_DURATION = 10
+      while retry_count <= MAX_RETRIES:
+        retry_count += 1
+        log.info(f'Synchronously requesting from OpenRouter')
+        response = requests.post(API_URL, headers=OPENROUTER_HEADERS, data=data_json)
+        log.info(f'Got response code {response.status_code} on input code {input_code} with response {response.content}')
+
+        if response.status_code == 200:
+          response_dict = json.loads(response.content)
+          response_model_text = response_dict['choices'][0]['text']
+          return response_model_text
+        else: # just wait
+          log.warn(f'Waiting for {WAIT_DURATION} seconds')
+          time.sleep(WAIT_DURATION)
+      log.error(f'Failed all reties')
+      return None # all retries failed
+
+
+    for input_code, payload in payloads.items():
+      assert isinstance(payload, str), f'Unsupported payload element type: {type(payload)}'
+      data_dict = {
+        "model": f"{self.model.owner}/{self.model.name}",
+        "prompt": payload
+      }
+      data_dict.update(model_parameters)
+      request_data_json = json.dumps(data_dict)
+
+      try:
+        generated_text = make_synchronous_request(data_json=request_data_json)
+      except Exception as e:
+        generated_text = None
+        log.error(e.with_traceback(None))
+        
+      if generated_text is None:
+        log.error(f'Failed to generate answer for input code {input_code}')
+        callback.increment_counter_in_notes('Exceptions on inference')
+      else:
+        callback.record_output(generated_text, input_code)
+  
 
 
   def assemble_model_parameters(self, max_new_tokens: int) -> dict:
