@@ -27,9 +27,9 @@ import torch
 from transformers import AutoTokenizer
 from transformers import pipeline
 
-from run_config import Config
-from runnable_model_data import RunnableModel
-from eval_results_callback import EvaluationResultsCallback
+from .run_config import Config
+from .runnable_model_data import RunnableModel
+from .eval_results_callback import EvaluationResultsCallback
 
 log = logging.getLogger(os.path.basename(__file__))
 logging.basicConfig(level=logging.INFO)
@@ -373,7 +373,7 @@ class SimpleRunner:
       def __init__(self) -> None:
         self.output = None
       
-      def record_output(self, output, **kwargs):
+      def record_output(self, output, *args, **kwargs):
         self.output = output
     
     self.callback = RecorderCallback()

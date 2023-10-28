@@ -8,9 +8,9 @@ from typing import *
 from transformers import AutoTokenizer
 from enum import Enum
 
-from run_config import Config
-from task_type import TaskType, new_tokens_limit_per_task_type_int, task_type_int_to_str
-from runnable_model_data import RunnableModel
+from .run_config import Config
+from .task_type import TaskType, new_tokens_limit_per_task_type_int, task_type_int_to_str
+from .runnable_model_data import RunnableModel
 
 log = logging.getLogger(os.path.basename(__file__))
 logging.basicConfig(level=logging.INFO)

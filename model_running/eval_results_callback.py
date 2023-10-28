@@ -7,8 +7,8 @@ from collections import Counter
 from typing import *
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error
 
-from data_handling import DatabaseConnector
-from task_type import TaskType
+from .data_handling_for_experiment_running import DatabaseConnector
+from .task_type import TaskType
 
 log = logging.getLogger("eval_results_callback.py")
 logging.basicConfig(level=logging.INFO)

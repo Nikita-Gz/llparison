@@ -1,0 +1,29 @@
+
+<div>
+  <div id="task_details">
+    <labe>Context (input code = {{input_code}}): </label>
+    <p>{{ question_context }}</p>
+    <labe>Question:</label>
+    <p>{{ question }}</p>
+    <labe>Options:</label>
+    <ul>
+    {% for option in options %}
+      <li>{{option}}</li>
+    {% endfor %}
+    </ul>
+    <labe>Answer: {{answer}}</label>
+    <br/>
+  </div>
+  <b>Specific model results:</b>
+  <div id="results_per_model">
+    {% for readable_name, prompt_and_counts in prompt_and_interpreted_output_counts_per_readable_llm_config_combination.items %}
+      <label>Iterpreted outputs for model {{readable_name}}:</label>
+      <pre><p>Prompt:{{prompt_and_counts.prompt}}</p></pre>
+      <ul>
+      {% for output_letter, count in prompt_and_counts.counts.items %}
+        <li>Answer {{output_letter}} - answered {{count}} times</li>
+      {% endfor %}
+      </ul>
+    {% endfor %}
+  </div>
+</div>
