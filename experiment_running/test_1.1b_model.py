@@ -84,6 +84,27 @@ db = DatabaseConnector(
             'discount': 0.0
           }
         ]
+      },
+      {
+        '_id': 'hf:HuggingFaceH4:zephyr-7b-beta',
+        'owner': 'HuggingFaceH4',
+        'name': 'zephyr-7b-beta',
+        'source': 'hf',
+        'first_tracked_on': str(datetime.datetime.now()),
+        'last_tracked_on': str(datetime.datetime.now()),
+        'tracking_history': [
+          {
+            'date': str(datetime.datetime.now()),
+            'hf_inference_api_supported': False,
+            'available': True,
+            'context_size': 4096,
+            'price_prompt': 0,
+            'price_completion': 0,
+            'prompt_limit': 4096,
+            'max_tokens_limit': 4096,
+            'discount': 0.0
+          }
+        ]
       }
     ]
   }
@@ -137,14 +158,13 @@ task.run_task(
 
 
 task = Task(TaskType.READING_COMPREHENSION)
-while True:
-  task.run_task(
-    db_connection=db,
-    date=str(datetime.datetime.now()),
-    cost_limit=None,
-    db_cache_limit=100,
-    path_to_save_db_on_update=DB_DUMP_FILE
-  )
+task.run_task(
+  db_connection=db,
+  date=str(datetime.datetime.now()),
+  cost_limit=None,
+  db_cache_limit=100,
+  path_to_save_db_on_update=DB_DUMP_FILE
+)
 task.run_task(
   db_connection=db,
   date=str(datetime.datetime.now()),

@@ -124,12 +124,43 @@ class MistralAlterator(PromptAlterator):
   
   def instruction(self, text: str) -> str:
     return ' '.join(['[INST]', text, '[/INST]'])
+  
+
+class Zephyr7BAlterator(PromptAlterator):
+  def _format_tag_and_text(self, tag:str, text: str) -> Tuple[str, str]:
+    """Since the tags are meant to be on newlines, this function removes a newline from the text (if there is one)
+    and places it before the tag"""
+    if text.startswith('\n'):
+      return '\n' + tag, text[1:]
+    else:
+      return tag, text
+  
+  def instruction(self, text: str) -> str:
+    """Converts the specified text into the following format:
+    <|system|>
+    text
+
+    If the text starts with an newline, then that newline is removed and placed before the assistant tag
+    """
+    tag, text = self._format_tag_and_text('<|system|>', text)
+    return '\n'.join([tag, text])
+  
+  def assistant_text(self, text: str) -> str:
+    """Converts the specified text into the following format:
+    <|assistant|>
+    text
+
+    If the text starts with an newline, then that newline is removed and placed before the assistant tag
+    """
+    tag, text = self._format_tag_and_text('<|assistant|>', text)
+    return '\n'.join([tag, text])
 
 
 def _get_prompt_alteration_mapping_for_model(model: RunnableModel) -> PromptAlterator:
   """Returns a propper prompt role marker for the model"""
   model_template_association = {
-    ('mistral-7b-instruct',): MistralAlterator
+    ('mistral-7b-instruct',): MistralAlterator,
+    ('zephyr-7b-beta',): Zephyr7BAlterator
   }
   selected_template = PromptAlterator
   for considered_template_model_names, prompt_template in model_template_association.items():
@@ -323,6 +354,7 @@ class PromptConstructor:
       self.tokenizer = existing_tokenizer
 
     self.prompt_alterator = _get_prompt_alteration_mapping_for_model(self.model)
+    log.info(f'Decided on the following prompt alterator: {type(self.prompt_alterator)}')
     self.constructor_function = self._get_prompt_constructor_function() # type: Callable
 
 
