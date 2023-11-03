@@ -424,6 +424,7 @@ class Task:
       excluded_input_ids=set([output['input_code'] for output in already_completed_outputs]),
       configuration=config,
       model=model)
+    log.info(f'Loaded {total_token_count} tokens')
     runner = ModelRunner(model, config)
 
     # process the cost
