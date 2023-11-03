@@ -84,7 +84,12 @@ db = DatabaseConnector(
             'discount': 0.0
           }
         ]
-      },
+      }
+    ]
+  }
+)
+
+""",
       {
         '_id': 'hf:HuggingFaceH4:zephyr-7b-beta',
         'owner': 'HuggingFaceH4',
@@ -105,10 +110,7 @@ db = DatabaseConnector(
             'discount': 0.0
           }
         ]
-      }
-    ]
-  }
-)
+      }"""
 
 DB_DUMP_FILE = './db_dump'
 def load_one_experiment_db_dump(db: DatabaseConnector):
