@@ -58,12 +58,12 @@ class EvaluationResultsCallback:
     min_counts = min(answer_counts)
     answer_count_difference = max_count - min_counts
 
-    answer_disproportion = 1 - (answer_count_difference / len(processed_output_values))
+    biggest_answer_count_difference = (answer_count_difference / len(processed_output_values))
 
     unfit_answers = sum([output['interpreted_output'] not in ['A', 'B', 'C', 'D'] for output in processed_output_values]) / len(processed_output_values)
     metrics = {
       'accuracy': accuracy,
-      'answer_disproportion': answer_disproportion,
+      'biggest_answer_count_difference': biggest_answer_count_difference,
       'unfit_answers': unfit_answers
     }
     log.info(f'Metrics: {metrics}')
@@ -138,7 +138,7 @@ class EvaluationResultsCallback:
     
     unfit_answers_portion = unfit_answers / len(self.processed_outputs)
     metrics = {
-      'R2': r2_score(true_values, preds),
+      #'R2': r2_score(true_values, preds),
       'MAPE': mean_absolute_percentage_error(true_values, preds),
       'accuracy': accuracy,
       'unfit_answers': unfit_answers_portion
