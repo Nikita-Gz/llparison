@@ -84,6 +84,27 @@ db = DatabaseConnector(
             'discount': 0.0
           }
         ]
+      },
+      {
+        '_id': 'hf:PY007:TinyLlama-1.1B-intermediate-step-480k-1T',
+        'owner': 'PY007',
+        'name': 'TinyLlama-1.1B-intermediate-step-480k-1T',
+        'source': 'hf',
+        'first_tracked_on': str(datetime.datetime.now()),
+        'last_tracked_on': str(datetime.datetime.now()),
+        'tracking_history': [
+          {
+            'date': str(datetime.datetime.now()),
+            'hf_inference_api_supported': False,
+            'available': True,
+            'context_size': 2048,
+            'price_prompt': 0,
+            'price_completion': 0,
+            'prompt_limit': 2048,
+            'max_tokens_limit': 2048,
+            'discount': 0.0
+          }
+        ]
       }
     ]
   }
@@ -159,14 +180,42 @@ task.run_task(
 '''
 
 
-task = Task(TaskType.READING_COMPREHENSION)
+task = Task(TaskType.BOT_DETECTION)
+
 task.run_task(
   db_connection=db,
   date=str(datetime.datetime.now()),
   cost_limit=None,
-  db_cache_limit=100,
+  db_cache_limit=500,
   path_to_save_db_on_update=DB_DUMP_FILE
 )
+task.run_task(
+  db_connection=db,
+  date=str(datetime.datetime.now()),
+  cost_limit=None,
+  db_cache_limit=500,
+  path_to_save_db_on_update=DB_DUMP_FILE
+)
+
+
+task = Task(TaskType.MULTIPLICATION)
+
+task.run_task(
+  db_connection=db,
+  date=str(datetime.datetime.now()),
+  cost_limit=None,
+  db_cache_limit=500,
+  path_to_save_db_on_update=DB_DUMP_FILE
+)
+task.run_task(
+  db_connection=db,
+  date=str(datetime.datetime.now()),
+  cost_limit=None,
+  db_cache_limit=500,
+  path_to_save_db_on_update=DB_DUMP_FILE
+)
+
+task = Task(TaskType.READING_COMPREHENSION)
 task.run_task(
   db_connection=db,
   date=str(datetime.datetime.now()),
