@@ -1,5 +1,3 @@
-# todo: turn all db connector files into one?
-
 import pandas as pd
 import random
 import pymongo
