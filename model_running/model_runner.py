@@ -1,7 +1,4 @@
 """
-Dirty copy of a model_runner.py from model_running module to ffacilitate quicker development.
-Todo: combine them all in a single module!
-
 This class will provide the means to run a variety of model types on the input data for different tasks.
 The class will chose the appropriate way to run the model (OAI API, OpenRouter, HF inference, local, etc)
 """
