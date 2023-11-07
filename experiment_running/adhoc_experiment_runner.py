@@ -155,12 +155,10 @@ db = DatabaseConnector(
       }"""
 
 DB_DUMP_FILE = './db_dump'
-def load_one_experiment_db_dump(db: DatabaseConnector):
+def load_db_dump(db: DatabaseConnector):
   db.load_data_from_file(DB_DUMP_FILE)
-  #outputs = list(db.experiments.find())[0]['outputs']
-  #log.info(f'Loaded {len(outputs)} experiment outputs')
 
-load_one_experiment_db_dump(db)
+load_db_dump(db)
 
 '''
 task = Task(TaskType.MULTIPLICATION)
