@@ -1,3 +1,7 @@
+"""
+This file contains the class and functions for interacting with databases and datasets
+"""
+
 import pandas as pd
 import random
 import pymongo
@@ -20,7 +24,9 @@ log = logging.getLogger("data_handling.py")
 logging.basicConfig(level=logging.INFO)
 
 class DatabaseConnector:
-  columns_list = ['first_tracked_on', 'last_tracked_on', 'available', 'original_name', 'owner', 'name', 'price_prompt', 'ff_inference_api_supported', 'source', 'price_completion', 'context', 'prompt_limit', 'max_tokens_limit']
+  """
+  Manages calls to the database, switches between real MongoDB database and MongoMock depending on the environment and settings
+  """
 
   def __init__(
       self,

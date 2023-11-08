@@ -1,4 +1,6 @@
-# todo: turn all db connector files into one?
+"""
+This code defines frontend-specific database-handling code
+"""
 
 import pandas as pd
 import pymongo
@@ -252,29 +254,6 @@ def get_unique_input_codes_from_evaluations(evaluations: List[Dict]) -> List[str
   return list(all_codes)
 
 
-"""
-Should report back unique filters in the following way:
-[
-  {
-    'name': 'temperature',
-    'values':
-    [
-      1.0, 0.5, 0.01
-    ],
-    'default': 1.0
-  },
-  {
-    'name': 'top-p',
-    'values':
-    [
-      0.2, 0.5, 0.9
-    ],
-    'default': 0.5
-  },
-],
-"""
-
-
 def get_possible_config_combinations_in_evaluations(evaluations: list) -> List[Dict[str, Any]]:
   combinations = set() # type Set[str]
 
@@ -291,8 +270,7 @@ def get_possible_config_combinations_in_evaluations(evaluations: list) -> List[D
 
   return final_combinations_list
 
-# wait wtf arent these two (func above and below) almost the same?
-# todo: make the lower one have a distinction
+# wait arent these two (func above and below) almost the same?
 
 def get_unique_config_params_in_evaluations(evaluations: list) -> List[Dict]:
   all_unique_config_params = dict() # type: Dict[Set]
@@ -304,7 +282,7 @@ def get_unique_config_params_in_evaluations(evaluations: list) -> List[Dict]:
       existing_set_of_unique_vals = all_unique_config_params.get(config_param_name, set()) # type: Set
       all_unique_config_params[config_param_name] = existing_set_of_unique_vals.union({config_param_value,})
 
-  # todo: rework fking all of this, why do i need a default value if i am just goign to set it to "all" later?
+  # todo: rework all of this, why do i need a default value if i am just goign to set it to "all" later?
   final_list = []
   for parameter_name, unique_values in all_unique_config_params.items():
     unique_values = list(unique_values)

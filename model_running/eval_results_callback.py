@@ -15,6 +15,10 @@ logging.basicConfig(level=logging.INFO)
 
 # computes scores and saves perliminary results into a db
 class EvaluationResultsCallback:
+  """
+  This class processes and records LLM's generation results to the database for a specified experiment and task, and it can compute and save the metrics
+  """
+  
   alphabet2idx = {letter:i for i, letter in enumerate(string.ascii_uppercase)}
   idx2alphabet = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
 

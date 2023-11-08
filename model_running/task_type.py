@@ -1,3 +1,9 @@
+"""
+This file defines the types of tasks that can be run as experiments, as well as providing additional data about the tasks
+
+TODO: use the strategy pattern, where each strategy would define a separate tasks and it's relevant data & task-specific methods
+"""
+
 from enum import Enum
 
 class TaskType(Enum):

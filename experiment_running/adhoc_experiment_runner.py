@@ -1,3 +1,7 @@
+"""
+This file defines the adhoc process for establishing the experimentation database, loading a database dump from a file, inserting a list of runnable models, and performing the experiments
+"""
+
 import logging
 import datetime
 import time

@@ -1,3 +1,7 @@
+"""
+This code provides the ability to run inference initiated by the user with user-provided task type and relevant data and parameters
+"""
+
 import logging
 from typing import *
 import datetime

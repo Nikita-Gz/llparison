@@ -29,6 +29,10 @@ logging.basicConfig(level=logging.INFO)
 
 
 class Task:
+  """
+  Defines the methods for starting and running an experiment on a certain task, managing data preparation, experiment creation, saving the results via EvaluationResultsCallback, and finishing up the experiment
+  """
+
   alphabet2idx = {letter:i for i, letter in enumerate(string.ascii_uppercase)}
   idx2alphabet = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
 

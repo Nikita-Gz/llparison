@@ -1,3 +1,7 @@
+"""
+This class defines a config (essentialy a dict...), which is a combination of hyperparameters (like temperature) and additional parameters, such as "prompt_type" that affects the prompt generation process)
+"""
+
 class Config:
   def __init__(self, parameters_dict=None) -> None:
     if parameters_dict is None:

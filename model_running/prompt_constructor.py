@@ -1,3 +1,7 @@
+"""
+This file defines the classes and methods necessary for constructing prompts for the LLMs
+"""
+
 import json
 import logging
 import os
@@ -21,6 +25,11 @@ idx2alphabet = {i:letter for i, letter in enumerate(string.ascii_uppercase)}
 
 
 class UniversalTokenizer:
+  """This class is an adapter for different tokenizers, it selects the appropriate tokenizer depending on the model.
+  It defaults to a cl100k_base tokenizer if the required tokenizer cannot be determined.
+  
+  It also performs caching of the tokenization results"""
+
   def __init__(self, model: RunnableModel) -> None:
     log.info(f'Creating tokenizer for model {model._id}')
 
@@ -93,13 +102,9 @@ class UniversalTokenizer:
       return self._tokenizer.decode(encoded_text) # type: ignore
 
 
-class PromptPart(Enum):
-  INSTRUCTION = 0
-  MODEL_GENERATED = 0
-
 
 class PromptAlterator:
-  """Default class for prompt alteration (like adding the appropriate instruction tokens around the prompt). Returns the same thing as it's inputs are"""
+  """Default class for prompt alteration strategies (like adding the appropriate instruction tokens around the prompt depending on the model). Returns the same thing as it's inputs are"""
 
   def start(self) -> str:
     """Returns a start of sentence token if applicable"""
