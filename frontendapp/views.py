@@ -20,6 +20,7 @@ from model_running.runnable_model_data import RunnableModel
 from .inference_runner import InferenceRunner
 
 import random
+import numpy as np
 from typing import *
 import pandas as pd
 import copy
@@ -187,6 +188,24 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
     return final_data_dict
 
 
+  def create_multiplication_error_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
+    log.info(f'Creating Multiplication error distrigution graph')
+    final_data_dict = {'graph_name': 'Error Distribution', 'score_label': 'Answer Count', 'values': []}
+    data_values_list = final_data_dict['values'] # type: list
+    errors = []
+    for experiment in experiments:
+      for output in experiment['outputs']:
+        input_code = output['input_code']
+        true_answer = MULTIPLICATION_DATASET[input_code][1]
+        model_answer = output['interpreted_output']
+        if model_answer is not None:
+          errors.append(abs(true_answer - model_answer))
+    bin_sizes, bin_ranges = np.histogram(errors, bins=10)
+    for bin_size, bin_range in zip(bin_sizes, bin_ranges[1:]):
+      data_values_list.append({'name': int(bin_range), 'value': int(bin_size)})
+    return final_data_dict
+
+
   # fills it up by tasks
   final_data_list= []
   unique_task_names_in_experiments = set([experiment['task_type'] for experiment in model_experiments])
@@ -203,6 +222,8 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
     # special graphs based on the task
     if current_task_name == 'Reading Comprehension':
       task_graphs.append(create_RC_answer_distribution_graph_data_dict(experiments_matching_the_task))
+    elif current_task_name == 'Multiplication':
+      task_graphs.append(create_multiplication_error_distribution_graph_data_dict(experiments_matching_the_task))
 
     final_data_list.append(task_record)
   
