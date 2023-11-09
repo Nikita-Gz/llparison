@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 from collections import Counter
 from typing import *
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error, mean_absolute_error
 
 from .data_handling_for_experiment_running import DatabaseConnector
 from .task_type import TaskType
@@ -143,7 +143,9 @@ class EvaluationResultsCallback:
     unfit_answers_portion = unfit_answers / len(self.processed_outputs)
     metrics = {
       #'R2': r2_score(true_values, preds),
-      'MAPE': mean_absolute_percentage_error(true_values, preds),
+      #'MAPE': mean_absolute_percentage_error(true_values, preds),
+      #'RMSE': mean_squared_error(true_values, preds)**0.5,
+      'MAE': mean_absolute_error(true_values, preds),
       'accuracy': accuracy,
       'unfit_answers': unfit_answers_portion
     }
@@ -262,9 +264,9 @@ class EvaluationResultsCallback:
     """Processes the raw model output into an interpreted output format applicable for the multiplication task"""
 
     def get_multiplication_answer_from_model_output(model_output: str) -> Union[int, None]:
-      """Returns the parsed int from the answer by looking for the first full integer in the output"""
+      """Returns the parsed int from the answer by looking for the first full integer in the output, ignoring commas"""
       assert model_output is not None, "Model output is none"
-      matches = re.findall(r'\d+', model_output) # type: List[str]
+      matches = re.findall(r'\d+', model_output.replace(',', '')) # type: List[str]
       if len(matches) == 0:
         return None
       first_answer = matches[0]
