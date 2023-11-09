@@ -7,7 +7,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from .frontend_data_handling import (
   DatabaseConnector, get_unique_config_params_in_evaluations, create_metrics_df, get_possible_config_combinations_in_evaluations, get_unique_input_codes_from_evaluations,
-  count_interpreted_answers_for_input_code,
+  get_raw_model_answers_and_interpreted_answers_for_input_code,
   filter_experiments_by_filters,
   aggregate_metrics_from_experiments,
   prettify_config_dict,
@@ -350,8 +350,8 @@ def _get_prompts_and_answer_counts_for_llm_config_combinations_for_dataset_entry
     log.info(f'Counting for combination {model_id, config}')
     evals = conn.get_evaluations_for_llm_config_task_combination(task_type_str, runnable_model, config)
     log.info(f'Got {len(evals)} evaluations')
-    interpreted_output_counts_for_model = count_interpreted_answers_for_input_code(evals, input_code)
-    log.info(f'Counts: {interpreted_output_counts_for_model}')
+    answers = get_raw_model_answers_and_interpreted_answers_for_input_code(evals, input_code)
+    log.info(f'Answers: {answers}')
     readable_combination_name = model_id + ' : ' + prettify_config_dict(config)
 
     tokenizer = tokenizers.get(model_id, UniversalTokenizer(runnable_model))
@@ -361,7 +361,7 @@ def _get_prompts_and_answer_counts_for_llm_config_combinations_for_dataset_entry
       'prompt': _get_prompt_for_model_config_combination(
         task_type_str, config, runnable_model,
         **task_specific_prompt_kwargs),
-      'counts': interpreted_output_counts_for_model
+      'answers': answers
     }
   return prompt_and_output_counts_per_llm_config_combination
 

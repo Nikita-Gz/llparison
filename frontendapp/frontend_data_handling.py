@@ -404,15 +404,14 @@ def create_metrics_df(
     dropna=False)['value'].mean()
 
 
-def count_interpreted_answers_for_input_code(evaluations: List[Dict], input_code: str) -> Dict[str, int]:
-  interpreted_output_counts = dict()
+def get_raw_model_answers_and_interpreted_answers_for_input_code(evaluations: List[Dict], input_code: str) -> Dict[str, int]:
+  answers = []
   for evaluation in evaluations:
-    #print('ASDFSDF'*50)
-    #print(evaluation)
-    interpreted_outputs = [output['interpreted_output'] for output in evaluation['outputs'] if output['input_code'] == input_code]
-    for interpreted_output in interpreted_outputs:
-      interpreted_output_counts[interpreted_output] = interpreted_output_counts.get(interpreted_output, 0) + 1
-  return interpreted_output_counts
+    outputs_of_interest = [output for output in evaluation['outputs'] if output['input_code'] == input_code]
+    for output in outputs_of_interest:
+      answers.append({'model_output': output['model_output'], 'interpreted_output': output['interpreted_output']})
+    
+  return answers
 
 
 def prettify_config_dict(config: Dict) -> str:

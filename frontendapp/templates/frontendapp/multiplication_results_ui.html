@@ -6,16 +6,16 @@
   </div>
   <b>Specific model results:</b>
   <div id="results_per_model">
-    {% for readable_name, prompt_and_counts in prompt_and_interpreted_output_counts_per_readable_llm_config_combination.items %}
-      {% if prompt_and_counts.counts|length > 0 %}
-        <label>Iterpreted outputs for model {{readable_name}}:</label>
-        <pre>Prompt:<p>{{prompt_and_counts.prompt}}</p></pre>
+    {% for readable_name, prompt_and_answers in prompt_and_interpreted_output_counts_per_readable_llm_config_combination.items %}
+      {% if prompt_and_answers.answers|length > 0 %}
+        <label>Outputs for this test for model {{readable_name}}:</label>
+        <pre><p>Prompt:{{prompt_and_answers.prompt}}</p></pre>
         <ul>
-        {% for answer, count in prompt_and_counts.counts.items %}
-          <li>Answer "{{answer}}" - answered {{count}} times</li>
+        {% for answer in prompt_and_answers.answers %}
+          <li>Answer {{ forloop.counter }}: "{{ answer.model_output }}" (interpreted as "{{ answer.interpreted_output }}")</li>
         {% endfor %}
         </ul>
-      {% else %}
+        {% else %}
         <label>There are no outputs for model {{readable_name}}</label>
       {% endif %}
     {% endfor %}
