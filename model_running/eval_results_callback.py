@@ -74,6 +74,27 @@ class EvaluationResultsCallback:
     return metrics
   
 
+  def _compute_science_questions_metrics(self):
+    log.info(f'Computing metrics for science questions')
+    processed_output_values = self.processed_outputs.values()
+    accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
+
+    answer_counts = list(Counter([output['interpreted_output'] for output in processed_output_values]).values())
+    max_count = max(answer_counts)
+    min_counts = min(answer_counts)
+    biggest_answer_count_difference = max_count - min_counts
+    biggest_answer_count_difference = (biggest_answer_count_difference / len(processed_output_values))
+
+    unfit_answers = sum([output['interpreted_output'] not in [1, 2, 3, 4] for output in processed_output_values]) / len(processed_output_values)
+    metrics = {
+      'accuracy': accuracy,
+      'biggest_answer_count_difference': biggest_answer_count_difference,
+      'unfit_answers': unfit_answers
+    }
+    log.info(f'Metrics: {metrics}')
+    return metrics
+  
+
   def _compute_bot_detection_metrics(self):
     log.info(f'Computing metrics for bot detection')
     processed_output_values = self.processed_outputs.values()
@@ -192,15 +213,17 @@ class EvaluationResultsCallback:
     if len(self._cached_output_writes) > 0:
       log.warning(f'There are {len(self._cached_output_writes)} unsaved writes when compute_and_save_metrics was called')
 
-    # go through all processed outputs. Flushes DB cache beforehand
-    if self.task == TaskType.READING_COMPREHENSION:
-      metrics = self._compute_reading_comprehension_metrics()
-    elif self.task == TaskType.BOT_DETECTION:
-      metrics = self._compute_bot_detection_metrics()
-    elif self.task == TaskType.MULTIPLICATION:
-      metrics = self._compute_multiplication_metrics()
-    else:
+    # goes through all processed outputs. Flushes DB cache beforehand
+
+    metrics_computator = {
+      TaskType.READING_COMPREHENSION: self._compute_reading_comprehension_metrics,
+      TaskType.BOT_DETECTION: self._compute_bot_detection_metrics,
+      TaskType.MULTIPLICATION: self._compute_multiplication_metrics,
+      TaskType.SCIENCE_QUESTIONS: self._compute_science_questions_metrics
+    }.get(self.task, None)
+    if metrics_computator is None:
       raise NotImplementedError(f'Metrics for task {self.task} are NYI')
+    metrics = metrics_computator()
     
     self.db_connection.set_metrics_to_experiment(self.experiment_id, metrics)
     self._dump_db_if_applicable()
@@ -231,6 +254,29 @@ class EvaluationResultsCallback:
     }
     return processed_output
   
+
+  def _process_science_questions_raw_output(self, raw_output: str, input_code: str) -> dict:
+    """Processes the raw model output into an interpreted output format applicable for the SQ task"""
+
+    def get_science_questions_answer_id_from_model_output(model_output: str) -> Union[int, None]:
+      assert model_output is not None, "Model output is none"
+      matches = re.findall(r'\d+', model_output) # type: List[str]
+      if len(matches) == 0:
+        return None
+      answer_id = int(matches[0])
+      return answer_id
+
+    model_answer_id = get_science_questions_answer_id_from_model_output(raw_output)
+    correct_answer_id = self.test_data[input_code]
+    correct = model_answer_id is not None and model_answer_id == correct_answer_id
+    processed_output = {
+      'interpreted_output': model_answer_id,
+      'model_output': raw_output,
+      'input_code': input_code,
+      'correct': correct
+    }
+    return processed_output
+
 
   def _process_bot_detection_raw_output(self, raw_output: str, input_code: str) -> dict:
     """Processes the raw model output into an interpreted output format applicable for the bot detection task"""
@@ -295,7 +341,8 @@ class EvaluationResultsCallback:
     output_interpreter = {
       TaskType.READING_COMPREHENSION: self._process_reading_comprehension_raw_output,
       TaskType.BOT_DETECTION: self._process_bot_detection_raw_output,
-      TaskType.MULTIPLICATION: self._process_multiplication_raw_output
+      TaskType.MULTIPLICATION: self._process_multiplication_raw_output,
+      TaskType.SCIENCE_QUESTIONS: self._process_science_questions_raw_output
     }.get(self.task, None)
 
     if output_interpreter is None:
