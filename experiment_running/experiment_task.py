@@ -45,7 +45,7 @@ class Task:
     return True
 
 
-  # TODO: combine code that prepares datasets for different tasks into one flexible funciton
+  # TODO: combine the code that prepares datasets for different tasks into one flexible funciton
   def _load_and_prepare_reading_comprehension_prompts(
       self,
       excluded_input_ids: set,
@@ -88,6 +88,45 @@ class Task:
     return prepared_prompts, total_token_count, total_prompts_cut, validation_data
 
 
+  # TODO: combine the code that prepares datasets for different tasks into one flexible funciton
+  def _load_and_prepare_science_questions_prompts(
+      self,
+      excluded_input_ids: set,
+      configuration: Config,
+      model: RunnableModel) -> Tuple[Dict, int, int, Dict]:
+    """Loads Sciq data as prompts, excluding a set of IDs.
+      Returns the dataset as a dict of {question_id: prompt}, total token count, number of cut prompts, and validation data for each input code"""
+    log.info('Preparing SciQ prompts')
+
+    sciq_dataset = load_appropriate_dataset_for_task(self.type) # type: Dict[str, Dict]
+
+    # converts the dataset into the following format:
+    # {
+    #   input_code: prompt_text
+    # }
+    prepared_prompts = dict()
+    validation_data = dict()
+    prompt_constructor = PromptConstructor(
+      model=model,
+      task_type=self.type,
+      configuration_dict=configuration.to_dict())
+    excluded_count, total_token_count, total_prompts_cut = 0
+    for input_code, question_dict in sciq_dataset.items():
+      if input_code in excluded_input_ids:
+        excluded_count += 1
+        continue
+      prompt, token_count, cut_by_n_tokens = prompt_constructor.construct_prompt(question_dict=question_dict)
+      prepared_prompts[input_code] = prompt
+      validation_data[input_code] = question_dict['answer_index']
+      total_token_count += token_count
+      if cut_by_n_tokens > 0:
+        total_prompts_cut += 1
+    log.info(f'Loaded {len(prepared_prompts)} questions, ({excluded_count} were excluded, {total_prompts_cut} were cut)')
+
+    return prepared_prompts, total_token_count, total_prompts_cut, validation_data
+
+
+  # TODO: combine the code that prepares datasets for different tasks into one flexible funciton
   def _load_and_prepare_bot_detection_prompts(
       self,
       excluded_input_ids: set,
@@ -126,6 +165,7 @@ class Task:
     return prepared_prompts, total_token_count, cut_posts_count, validation_data
 
 
+  # TODO: combine the code that prepares datasets for different tasks into one flexible funciton
   def _load_and_prepare_multiplication_prompts(
       self,
       excluded_input_ids: set,
@@ -174,6 +214,7 @@ class Task:
       TaskType.READING_COMPREHENSION: self._load_and_prepare_reading_comprehension_prompts,
       TaskType.BOT_DETECTION: self._load_and_prepare_bot_detection_prompts,
       TaskType.MULTIPLICATION: self._load_and_prepare_multiplication_prompts,
+      TaskType.SCIENCE_QUESTIONS: self._load_and_prepare_science_questions_prompts
     }
     return prompt_preparators[self.type](
       excluded_input_ids=excluded_input_ids,
@@ -229,7 +270,8 @@ class Task:
     config_creators_by_task_types = {
       TaskType.READING_COMPREHENSION: get_configs_for_rc,
       TaskType.BOT_DETECTION: get_configs_for_bot_detection,
-      TaskType.MULTIPLICATION: get_configs_for_multiplication
+      TaskType.MULTIPLICATION: get_configs_for_multiplication,
+      TaskType.SCIENCE_QUESTIONS: get_configs_for_rc # SQ task will use the same configs as RC task
     }
     config_creator = config_creators_by_task_types[self.type] # type: Callable
     
