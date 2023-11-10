@@ -24,7 +24,7 @@ new_tokens_limit_per_task_type_int = {
   TaskType.READING_COMPREHENSION: 3,
   TaskType.BOT_DETECTION: 1,
   TaskType.MULTIPLICATION: 9,
-  TaskType.SCIENCE_QUESTIONS: 3
+  TaskType.SCIENCE_QUESTIONS: 4
 }
 
 new_tokens_limit_per_task_type_str = {s:new_tokens_limit_per_task_type_int[i] for i, s in task_type_int_to_str.items()}
