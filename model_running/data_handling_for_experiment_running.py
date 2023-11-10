@@ -349,6 +349,28 @@ def _load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
   return rc_texts, rc_questions
 
 
+def _load_raw_science_questions_data() -> Dict[str, Tuple[bool, List[str]]]:
+  """Fills Science Questions dataset with data of the following format:
+
+  {
+    input_code:
+    {
+      question, # true if the post is made by a bot
+      option0,
+      option1,
+      option2,
+      option3,
+      answer_index # starts from 0, an integer
+    }
+  }
+  """
+
+  log.info('Loading science questions dataset')
+  with open("./sciq.json", 'r') as file:
+    dataset = json.load(file)
+  return dataset
+
+
 def _load_raw_bot_detection_data() -> Dict[str, Tuple[bool, List[str]]]:
   """Fills BOT_DETECTION_DATASET with data of the following format:
 
@@ -416,7 +438,8 @@ def load_appropriate_dataset_for_task(task_type: TaskType) -> Any:
   appropriate_data_loader_for_task = {
     TaskType.READING_COMPREHENSION: _load_raw_reading_comprehension_data,
     TaskType.BOT_DETECTION: _load_raw_bot_detection_data,
-    TaskType.MULTIPLICATION: _load_raw_multiplication_data
+    TaskType.MULTIPLICATION: _load_raw_multiplication_data,
+    TaskType.SCIENCE_QUESTIONS: _load_raw_science_questions_data
   }.get(task_type, None)
 
   if appropriate_data_loader_for_task is not None:
