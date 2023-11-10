@@ -434,6 +434,7 @@ def load_appropriate_dataset_for_task(task_type: TaskType) -> Any:
   - For reading comprehension: returns a dict of {input_code: question text} and a dict of {input_code: question data}
   - For bot detection: returns a dict of {input_code: (is a bot, list of post history strings)}
   - For basic math: returns a dict of {input_code: (math expression like "90+47=", answer value), ...} 
+  - For science questions, returns a dict of {input_code: a dictionary of question details that includes "answer_index" key}
   """
   appropriate_data_loader_for_task = {
     TaskType.READING_COMPREHENSION: _load_raw_reading_comprehension_data,
