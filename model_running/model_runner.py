@@ -284,9 +284,11 @@ class ModelRunner:
       log.error(f'Failed all reties')
       return None # all retries failed
 
-
-    for input_code, payload in payloads.items():
+    payloads = payloads.items()
+    for payload_i, (input_code, payload) in enumerate(payloads):
       assert isinstance(payload, str), f'Unsupported payload element type: {type(payload)}'
+      log.info(f'Processing payload {payload_i+1} out of {len(payloads)} payloads to process')
+
       data_dict = {
         "model": f"{self.model.owner}/{self.model.name}",
         "prompt": payload
