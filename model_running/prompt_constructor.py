@@ -234,12 +234,12 @@ def _construct_default_science_questions_prompt(
   
   Unlike Reading Comprehension prompt constructor, this one will be using 1/2/3/4 answer labels, instead of A/B/C/D, for variety"""
 
-  header_text = 'Read the question and choose the number that corresponds to the correct answer option\n'
+  header_text = 'Read the question and choose the digit that corresponds to the correct answer'
   question_text = '\nQuestion: ' + question_dict['question']
   options_text = '\nPossible answer options:\n' + '\n'.join([
-    f'{option_index+1}) {question_dict[option_label]}'
-    for option_index, option_label in enumerate(['option0', 'option1', 'option2', 'option3'])])
-  suffix_text = '\nThe correct answer is the number:'
+    f'Answer #{option_index+1}) {question_dict[option_label]}'
+    for option_index, option_label in enumerate(['option1', 'option2', 'option3', 'option4'])])
+  suffix_text = '\nThe digit that corresponds to the correct answer: #'
 
   # this prompt should be small enough for any model. In case where the prompt exceeds the allowed size - just crash
   encoded_text = tokenizer.encode([header_text, question_text, options_text, suffix_text]) # type: List[List[int]]

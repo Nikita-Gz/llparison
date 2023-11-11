@@ -110,7 +110,7 @@ class Task:
       model=model,
       task_type=self.type,
       configuration_dict=configuration.to_dict())
-    excluded_count, total_token_count, total_prompts_cut = 0
+    excluded_count = total_token_count = total_prompts_cut = 0
     for input_code, question_dict in sciq_dataset.items():
       if input_code in excluded_input_ids:
         excluded_count += 1
