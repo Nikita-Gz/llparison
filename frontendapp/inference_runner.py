@@ -38,6 +38,21 @@ class InferenceRunner:
     return created_arguments
   
 
+  def _make_science_questions_prompt_arguments(self, input_fields: Dict[str, str]) -> Dict:
+    """Returns kwargs to be sent to prompt constructor when running science questions task"""
+    created_arguments = {
+      'question_dict': {
+        'question': input_fields['Question'],
+        'option1': input_fields['Answer 1'], # this would be much less readable as a one-liner
+        'option2': input_fields['Answer 2'],
+        'option3': input_fields['Answer 3'],
+        'option4': input_fields['Answer 4']
+      }
+    }
+    log.info(f'Created the following inference arguments: {created_arguments}')
+    return created_arguments
+  
+
   def _make_bot_detection_prompt_arguments(self, input_fields: Dict[str, str]) -> Dict:
     """Returns kwargs to be sent to prompt constructor when running bot detection task"""
     created_arguments = {
@@ -71,7 +86,8 @@ class InferenceRunner:
     prompt_constructor_kwargs_builder = {
       TaskType.READING_COMPREHENSION: self._make_reading_comprehension_prompt_arguments,
       TaskType.BOT_DETECTION: self._make_bot_detection_prompt_arguments,
-      TaskType.MULTIPLICATION: self._make_multiplication_prompt_arguments
+      TaskType.MULTIPLICATION: self._make_multiplication_prompt_arguments,
+      TaskType.SCIENCE_QUESTIONS: self._make_science_questions_prompt_arguments
     }[task_type]
 
 

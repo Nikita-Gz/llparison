@@ -11,7 +11,7 @@ from .frontend_data_handling import (
   filter_experiments_by_filters,
   aggregate_metrics_from_experiments,
   prettify_config_dict,
-  RC_QUESTIONS, RC_TEXTS, BOT_DETECTION_DATASET, MULTIPLICATION_DATASET
+  RC_QUESTIONS, RC_TEXTS, BOT_DETECTION_DATASET, MULTIPLICATION_DATASET, SCIENCE_QUESTIONS_DATASET
 )
 from model_running.prompt_constructor import PromptConstructor, UniversalTokenizer
 from model_running.run_config import Config
@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 conn = DatabaseConnector(
   fill_with_testing_stuff=False,
-  path_to_preload_data='./db_dump')
+  path_to_preload_data='./db_dump_sqtask')
 inferer = InferenceRunner(conn)
 
 # this will hold requested universal tokenizers for each model ID
@@ -160,8 +160,9 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
       data_values.append({'name': metric_name, 'value': metric_value})
     return data_dict
   
-  def create_RC_answer_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
-    log.info(f'Creating RC answer distrigution graph')
+  def create_answer_distribution_graph_data_dict(experiments: List[Dict],
+                                                 acceptable_answers: List) -> Dict[str, Union[str, Dict]]:
+    log.info(f'Creating answer distrigution graph')
     final_data_dict = {'graph_name': 'Answer Distribution', 'score_label': 'Answer Count', 'values': []}
     data_values_list = final_data_dict['values'] # type: list
 
@@ -171,7 +172,7 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
 
       # Changes answers that aren't A/B/C/D into "Others"
       corrected_interpreted_answers = [
-        answer if answer in ['A', 'B', 'C', 'D'] else 'Other'
+        answer if answer in acceptable_answers else 'Other'
         for answer in interpreted_answers_in_experiment]
 
       interpreted_answer_counter.update(corrected_interpreted_answers)
@@ -180,13 +181,20 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
     for interpreted_value_name, occurence_count in dict(interpreted_answer_counter).items():
       if interpreted_value_name is None:
         interpreted_value_name = '-'
-      data_values_list.append({'name': interpreted_value_name, 'value': occurence_count})
+      data_values_list.append({'name': str(interpreted_value_name), 'value': occurence_count})
 
     log.info(f'Got the following counts: {data_values_list}')
     final_data_dict['values'] = sorted(data_values_list, key=lambda answer_count: answer_count['name'])
     
     return final_data_dict
 
+
+  def create_RC_answer_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
+    return create_answer_distribution_graph_data_dict(experiments, acceptable_answers=['A', 'B', 'C', 'D'])
+  
+  def create_SQ_answer_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
+    return create_answer_distribution_graph_data_dict(experiments, acceptable_answers=[1, 2, 3, 4])
+  
 
   def create_multiplication_error_distribution_graph_data_dict(experiments: List[Dict]) -> Dict[str, Union[str, Dict]]:
     log.info(f'Creating Multiplication error distrigution graph')
@@ -224,6 +232,8 @@ def create_single_model_graphs_data(model_experiments: List[Dict]) -> List[Dict]
       task_graphs.append(create_RC_answer_distribution_graph_data_dict(experiments_matching_the_task))
     elif current_task_name == 'Multiplication':
       task_graphs.append(create_multiplication_error_distribution_graph_data_dict(experiments_matching_the_task))
+    if current_task_name == 'Science Questions':
+      task_graphs.append(create_SQ_answer_distribution_graph_data_dict(experiments_matching_the_task))
 
     final_data_list.append(task_record)
   
@@ -333,6 +343,9 @@ def _get_task_specific_dataset_entry_for_input_code(task_type_str: str, input_co
   elif task_type_int == TaskType.MULTIPLICATION:
     equation, answer = MULTIPLICATION_DATASET[input_code]
     return {'math_expression': equation, 'answer': answer}
+  elif task_type_int == TaskType.SCIENCE_QUESTIONS:
+    question_dict = SCIENCE_QUESTIONS_DATASET[input_code]
+    return {'question_dict': question_dict}
   else:
     raise Exception(f'Unknown task type "{task_type_str}"')
 
@@ -387,6 +400,11 @@ def _get_task_specific_context(input_code:str, task_type_str: str, llm_configs: 
     equation, answer = MULTIPLICATION_DATASET[input_code]
     context['equation'] = equation
     context['answer'] = answer
+  elif task_type_as_enum == TaskType.SCIENCE_QUESTIONS:
+    question_dict = SCIENCE_QUESTIONS_DATASET[input_code]
+    context['question'] = question_dict['question']
+    context['options'] = [question_dict[f'option{i+1}'] for i in range(4)]
+    context['answer_index'] = question_dict['answer_index']
   else:
     raise Exception(f'Unknown task type "{task_type_str}"')
   
@@ -412,7 +430,8 @@ def _draw_single_test_results(request) -> HttpResponse:
   appropriate_render_template = {
     TaskType.READING_COMPREHENSION: 'frontendapp/rc_results_ui.html',
     TaskType.BOT_DETECTION: 'frontendapp/bd_results_ui.html',
-    TaskType.MULTIPLICATION: 'frontendapp/multiplication_results_ui.html'
+    TaskType.MULTIPLICATION: 'frontendapp/multiplication_results_ui.html',
+    TaskType.SCIENCE_QUESTIONS: 'frontendapp/sq_results_ui.html'
   }[task_type_str_to_int[task_type_str]]
 
   return render(request, appropriate_render_template, context)

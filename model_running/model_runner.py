@@ -318,6 +318,7 @@ class ModelRunner:
       'top_p': (0.9, float),
       'top_k': (1, int),
       'max_new_tokens': (max_new_tokens, int),
+      'min_new_tokens': (min(3, max_new_tokens), int),
       'return_full_text': (False, bool),
       'do_sample': (True, bool),
     }

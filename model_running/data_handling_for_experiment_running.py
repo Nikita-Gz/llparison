@@ -349,6 +349,28 @@ def _load_raw_reading_comprehension_data() -> Tuple[Dict, Dict]:
   return rc_texts, rc_questions
 
 
+def _load_raw_science_questions_data() -> Dict[str, Tuple[bool, List[str]]]:
+  """Fills Science Questions dataset with data of the following format:
+
+  {
+    input_code:
+    {
+      question, # true if the post is made by a bot
+      option0,
+      option1,
+      option2,
+      option3,
+      answer_index # starts from 0, an integer
+    }
+  }
+  """
+
+  log.info('Loading science questions dataset')
+  with open("./sciq.json", 'r') as file:
+    dataset = json.load(file)
+  return dataset
+
+
 def _load_raw_bot_detection_data() -> Dict[str, Tuple[bool, List[str]]]:
   """Fills BOT_DETECTION_DATASET with data of the following format:
 
@@ -412,11 +434,13 @@ def load_appropriate_dataset_for_task(task_type: TaskType) -> Any:
   - For reading comprehension: returns a dict of {input_code: question text} and a dict of {input_code: question data}
   - For bot detection: returns a dict of {input_code: (is a bot, list of post history strings)}
   - For basic math: returns a dict of {input_code: (math expression like "90+47=", answer value), ...} 
+  - For science questions, returns a dict of {input_code: a dictionary of question details that includes "answer_index" key}
   """
   appropriate_data_loader_for_task = {
     TaskType.READING_COMPREHENSION: _load_raw_reading_comprehension_data,
     TaskType.BOT_DETECTION: _load_raw_bot_detection_data,
-    TaskType.MULTIPLICATION: _load_raw_multiplication_data
+    TaskType.MULTIPLICATION: _load_raw_multiplication_data,
+    TaskType.SCIENCE_QUESTIONS: _load_raw_science_questions_data
   }.get(task_type, None)
 
   if appropriate_data_loader_for_task is not None:

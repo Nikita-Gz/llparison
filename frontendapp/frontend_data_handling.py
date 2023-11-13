@@ -16,13 +16,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from model_running.runnable_model_data import RunnableModel
 from .fake_run_data import get_fake_testing_evaluations
+from model_running.data_handling_for_experiment_running import _load_raw_science_questions_data
 
 log = logging.getLogger("data_handling.py")
 logging.basicConfig(level=logging.INFO)
 
 RC_TEXTS = None # type: Dict[str, str]
 RC_QUESTIONS = None # type: Dict[str, Dict]
-
 def _load_raw_reading_comprehension_data():
   global RC_TEXTS
   global RC_QUESTIONS
@@ -32,6 +32,9 @@ def _load_raw_reading_comprehension_data():
   RC_TEXTS = dataset['texts']
   RC_QUESTIONS = dataset['questions']
 _load_raw_reading_comprehension_data()
+
+
+SCIENCE_QUESTIONS_DATASET = _load_raw_science_questions_data()
 
 
 BOT_DETECTION_DATASET = None # type: Dict[str, Tuple[bool, List[str]]]
@@ -251,7 +254,7 @@ def get_unique_input_codes_from_evaluations(evaluations: List[Dict]) -> List[str
   for evaluation in evaluations:
     codes = set([output['input_code'] for output in evaluation['outputs']])
     all_codes = all_codes.union(codes)
-  return list(all_codes)
+  return sorted(list(all_codes))
 
 
 def get_possible_config_combinations_in_evaluations(evaluations: list) -> List[Dict[str, Any]]:

@@ -222,6 +222,38 @@ def _construct_default_reading_comprehension_prompt(
   return final_text, max_tokens_after_generation, exceeded_context_size_by
 
 
+def _construct_default_science_questions_prompt(
+    question_dict: dict,
+    model: RunnableModel,
+    tokenizer: UniversalTokenizer,
+    prompt_alterator: PromptAlterator,
+    **kwargs) -> Tuple[str, int, int]:
+  """Creates a default Science Quesions prompt, appropriate for the model
+  
+  Returns the prompt, token count, and the number of tokens it was cut by
+  
+  Unlike Reading Comprehension prompt constructor, this one will be using 1/2/3/4 answer labels, instead of A/B/C/D, for variety"""
+
+  header_text = 'Read the question and choose the digit that corresponds to the correct answer'
+  question_text = '\nQuestion: ' + question_dict['question']
+  options_text = '\nPossible answer options:\n' + '\n'.join([
+    f'Answer #{option_index+1}) {question_dict[option_label]}'
+    for option_index, option_label in enumerate(['option1', 'option2', 'option3', 'option4'])])
+  suffix_text = '\nThe digit that corresponds to the correct answer: #'
+
+  # this prompt should be small enough for any model. In case where the prompt exceeds the allowed size - just crash
+  encoded_text = tokenizer.encode([header_text, question_text, options_text, suffix_text]) # type: List[List[int]]
+  token_count = sum([len(tokens) for tokens in encoded_text]) + CONTEXT_SIZE_LEEWAY
+  assert token_count < model.context_size, f'Text ({token_count}) is larger than model context ({model.context_size})'
+  max_tokens_after_generation = token_count + new_tokens_limit_per_task_type_int[TaskType.SCIENCE_QUESTIONS]
+  exceeded_context_size_by = 0
+
+  final_text = (prompt_alterator.start() +
+                prompt_alterator.instruction(''.join([header_text, question_text, options_text])) +
+                prompt_alterator.assistant_text(suffix_text))
+  return final_text, max_tokens_after_generation, exceeded_context_size_by
+
+
 def _construct_default_bot_detection_prompt(
     post_history: List[str],
     model: RunnableModel,
@@ -335,6 +367,9 @@ PROMPT_CONSTRUCTORS_MAP = { # maps task type and prompt type to constructor func
     'default': _construct_multiplication_prompt,
     NAME_OF_MULTIPLICATION_PROMPT_WITH_EXAMPLES: _construct_multiplication_prompt,
     'without examples': _construct_multiplication_prompt
+  },
+  TaskType.SCIENCE_QUESTIONS: {
+    'default': _construct_default_science_questions_prompt
   }
 }
 
@@ -372,6 +407,8 @@ class PromptConstructor:
     - - post_history: List[str]
     - Basic Math:
     - - math_expression: str
+    - Science Questions:
+    - - question_dict: dict
 
     Returns the prompt text, token count, as well as the number of tokens it was cut by
     """

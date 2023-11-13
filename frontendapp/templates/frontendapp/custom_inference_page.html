@@ -67,6 +67,13 @@
         'Answer 3',
         'Answer 4',
       ],
+      science_questions: [
+        'Question',
+        'Answer 1',
+        'Answer 2',
+        'Answer 3',
+        'Answer 4',
+      ],
       bot_detection: [
         'Post history'
       ],
@@ -82,6 +89,8 @@
       selected_fields = fields_for_task.bot_detection
     } else if (selected_task == "Multiplication") {
       selected_fields = fields_for_task.multiplication
+    } else if (selected_task == "Science Questions") {
+      selected_fields = fields_for_task.science_questions
     } else {
       throw ("The task " + selected_task + " is unknown")
     }
@@ -137,7 +146,7 @@
         config: JSON.stringify(parameters_dict)
       },
       success: function(response) {
-        model_results_label.textContent = "Model " + model_id + " inference result: " + response['output'] + " (in " + response['microseconds'] + " microseconds)"
+        model_results_label.textContent = "Model " + model_id + " inference result: \"" + response['output'] + "\" (in " + response['microseconds'] + " microseconds)"
       },
       error: function(xhr) {
         alert(xhr)
