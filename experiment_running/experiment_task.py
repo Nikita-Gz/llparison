@@ -112,12 +112,12 @@ class Task:
       configuration_dict=configuration.to_dict())
     excluded_count = total_token_count = total_prompts_cut = 0
     for input_code, question_dict in sciq_dataset.items():
+      validation_data[input_code] = question_dict['answer_index']
       if input_code in excluded_input_ids:
         excluded_count += 1
         continue
       prompt, token_count, cut_by_n_tokens = prompt_constructor.construct_prompt(question_dict=question_dict)
       prepared_prompts[input_code] = prompt
-      validation_data[input_code] = question_dict['answer_index']
       total_token_count += token_count
       if cut_by_n_tokens > 0:
         total_prompts_cut += 1
