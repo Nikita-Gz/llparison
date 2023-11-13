@@ -254,7 +254,7 @@ def get_unique_input_codes_from_evaluations(evaluations: List[Dict]) -> List[str
   for evaluation in evaluations:
     codes = set([output['input_code'] for output in evaluation['outputs']])
     all_codes = all_codes.union(codes)
-  return list(all_codes)
+  return sorted(list(all_codes))
 
 
 def get_possible_config_combinations_in_evaluations(evaluations: list) -> List[Dict[str, Any]]:
