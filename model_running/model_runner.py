@@ -307,6 +307,7 @@ class ModelRunner:
         callback.increment_counter_in_notes('Exceptions on inference')
       else:
         callback.record_output(generated_text, input_code)
+      time.sleep(1)
   
 
 
