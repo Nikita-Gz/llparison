@@ -57,7 +57,8 @@ class EvaluationResultsCallback:
     processed_output_values = self.processed_outputs.values()
     accuracy = sum([output['correct'] for output in processed_output_values]) / len(processed_output_values)
 
-    answer_counts = list(Counter([output['interpreted_output'] for output in processed_output_values]).values())
+    answer_counter = Counter([output['interpreted_output'] for output in processed_output_values if output['interpreted_output'] is not None])
+    answer_counts = list(answer_counter.values())
     max_count = max(answer_counts)
     min_counts = min(answer_counts)
     answer_count_difference = max_count - min_counts
