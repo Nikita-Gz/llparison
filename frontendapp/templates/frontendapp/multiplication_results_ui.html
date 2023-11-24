@@ -1,10 +1,11 @@
 <div>
   <div id="task_details">
-    <label>Equation (Input code: {{input_code}}): {{equation}}</label>
+    <b><label>Input code: "{{input_code}}", equation: "{{equation}}"</label></b>
+    <br/>
     <labe>The correct answer: {{answer}}</label>
     <br/>
   </div>
-  <b>Specific model results:</b>
+  <b>Test results for specific LLM-configuration combinations:</b>
   <div id="results_per_model">
     {% for readable_name, prompt_and_answers in prompt_and_interpreted_output_counts_per_readable_llm_config_combination.items %}
       {% if prompt_and_answers.answers|length > 0 %}
@@ -12,7 +13,7 @@
         <pre><p>Prompt:{{prompt_and_answers.prompt}}</p></pre>
         <ul>
         {% for answer in prompt_and_answers.answers %}
-          <li>Answer {{ forloop.counter }}: "{{ answer.model_output }}" (interpreted as "{{ answer.interpreted_output }}")</li>
+          <li>Answer #{{ forloop.counter }}: "{{ answer.model_output }}" (interpreted as "{{ answer.interpreted_output }}")</li>
         {% endfor %}
         </ul>
         {% else %}

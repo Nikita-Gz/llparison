@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 conn = DatabaseConnector(
   fill_with_testing_stuff=False,
-  path_to_preload_data='./db_dump_sqtask')
+  path_to_preload_data='./db_dump')
 inferer = InferenceRunner(conn)
 
 # this will hold requested universal tokenizers for each model ID

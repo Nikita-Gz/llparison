@@ -101,12 +101,13 @@
     selected_fields.forEach((field_to_create) => {
       var specific_field_holder = document.createElement('li')
       var field_label = document.createElement('label')
-      field_label.textContent = field_to_create + ": "
+      field_label.textContent = field_to_create + ":  "
       var input_field_name = field_to_create
       var input_field_id = input_field_name + "_id"
       var input_field = document.createElement('textarea')
       input_field.setAttribute('name', input_field_name);
       input_field.setAttribute('id', input_field_id);
+      input_field.setAttribute('style', 'height: 30px; width: 500px;');
       input_field.setAttribute('placeholder', "Enter value for \"" + field_to_create + "\"");
 
       task_specific_field_input_elements.push(input_field)

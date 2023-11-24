@@ -1,8 +1,8 @@
 <div>
   <div id="task_details">
-    <labe>Question (input code = {{input_code}}): </label>
+    <b><label>Question (input code = {{input_code}}): </label></b>
     <p>{{ question }}</p>
-    <labe>Answer options:</label>
+    <label>Answer options:</label>
     <ul>
     {% for option in options %}
       <li>Answer #{{forloop.counter}}) {{option}}</li>
