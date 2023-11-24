@@ -305,7 +305,7 @@ class Task:
     """
     # picks out combinations that either were never tested,
     # or are hosted by OpenRouter and haven't been tested in a while
-    PROPRIETARY_MODEL_TIMEOUT = datetime.timedelta(days=31)
+    PROPRIETARY_MODEL_TIMEOUT = datetime.timedelta(days=300)
     PROPRIETARY_SOURCES_LIST = ['OpenRouter']
     combinations_to_evaluate = []
     for considered_combination in possible_combinations:
