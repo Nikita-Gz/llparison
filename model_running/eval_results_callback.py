@@ -168,6 +168,7 @@ class EvaluationResultsCallback:
       #'MAPE': mean_absolute_percentage_error(true_values, preds),
       #'RMSE': mean_squared_error(true_values, preds)**0.5,
       'MAE': mean_absolute_error(true_values, preds),
+      'Median Absolute Error': np.median(np.abs(true_values - preds)),
       'accuracy': accuracy,
       'unfit_answers': unfit_answers_portion
     }
