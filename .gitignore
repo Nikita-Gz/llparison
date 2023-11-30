@@ -7,6 +7,7 @@ s/
 __pycache__/
 secrets.yaml
 db_dump*
+helloworld_container/
 
 # datasets with limited access
 bot_or_not.json
