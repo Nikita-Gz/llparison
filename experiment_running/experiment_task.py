@@ -354,7 +354,7 @@ class Task:
       return None, None
 
     combination_for_evaluation = random.choice(combinations_up_for_evaluation)
-    log.info(f'Chosen combination {combination_for_evaluation}')
+    log.info(f'Chosen combination of model {combination_for_evaluation[0]} and config {combination_for_evaluation[1]}')
     experiment_id = db_connection.create_experiment_stump(
       model=combination_for_evaluation[0],
       task_type=task_type_int_to_str[self.type],
