@@ -164,9 +164,7 @@ def load_db_dump(db: DatabaseConnector):
 
 load_db_dump(db)
 
-'''
-task = Task(TaskType.MULTIPLICATION)
-while True:
+"""
   task.run_task(
     db_connection=db,
     date=str(datetime.datetime.now()),
@@ -174,35 +172,9 @@ while True:
     db_cache_limit=500,
     path_to_save_db_on_update=DB_DUMP_FILE
   )
-task.run_task(
-  db_connection=db,
-  date=str(datetime.datetime.now()),
-  cost_limit=None,
-  db_cache_limit=500,
-  path_to_save_db_on_update=DB_DUMP_FILE
-)
-'''
+"""
 
-'''
-task = Task(TaskType.BOT_DETECTION)
-
-task.run_task(
-  db_connection=db,
-  date=str(datetime.datetime.now()),
-  cost_limit=None,
-  db_cache_limit=60,
-  path_to_save_db_on_update=DB_DUMP_FILE
-)
-task.run_task(
-  db_connection=db,
-  date=str(datetime.datetime.now()),
-  cost_limit=None,
-  db_cache_limit=60,
-  path_to_save_db_on_update=DB_DUMP_FILE
-)
-'''
-
-
+"""
 task = Task(TaskType.BOT_DETECTION)
 
 task.run_task(
@@ -212,37 +184,14 @@ task.run_task(
   db_cache_limit=500,
   path_to_save_db_on_update=DB_DUMP_FILE
 )
-task.run_task(
-  db_connection=db,
-  date=str(datetime.datetime.now()),
-  cost_limit=None,
-  db_cache_limit=500,
-  path_to_save_db_on_update=DB_DUMP_FILE
-)
+"""
 
-
-task = Task(TaskType.MULTIPLICATION)
-
-task.run_task(
-  db_connection=db,
-  date=str(datetime.datetime.now()),
-  cost_limit=None,
-  db_cache_limit=500,
-  path_to_save_db_on_update=DB_DUMP_FILE
-)
-task.run_task(
-  db_connection=db,
-  date=str(datetime.datetime.now()),
-  cost_limit=None,
-  db_cache_limit=500,
-  path_to_save_db_on_update=DB_DUMP_FILE
-)
-
-task = Task(TaskType.READING_COMPREHENSION)
-task.run_task(
-  db_connection=db,
-  date=str(datetime.datetime.now()),
-  cost_limit=None,
-  db_cache_limit=500,
-  path_to_save_db_on_update=DB_DUMP_FILE
-)
+while True:
+  task = Task(TaskType.READING_COMPREHENSION)
+  task.run_task(
+    db_connection=db,
+    date=str(datetime.datetime.now()),
+    cost_limit=None,
+    db_cache_limit=500,
+    path_to_save_db_on_update=DB_DUMP_FILE
+  )
